@@ -472,7 +472,7 @@ class LlamaExtractV2Provider(Provider):
         start = time.monotonic()
         poll_started_at = datetime.now().isoformat()
 
-        # Request both expandable blocks on every poll. The V2 extract API
+        # Request expandable metadata and telemetry on every poll. The V2 extract API
         # strips them from the GET response unless the caller opts in.
         #
         # ``extract_metadata``: without it citations have no ``bounding_boxes``
@@ -482,7 +482,10 @@ class LlamaExtractV2Provider(Provider):
         # ``usage.num_pages_billed``. It comes back null unless expanded, and
         # without it there is no billable page count, so cost falls back to a
         # schema estimate (or to nothing at all on non-Agentic-Plus tiers).
-        poll_params: dict[str, Any] = {**params, "expand": ["metadata", "extract_metadata"]}
+        poll_params: dict[str, Any] = {
+            **params,
+            "expand": ["metadata", "extract_metadata", "latency", "metadata_state_transitions"],
+        }
 
         poll_history: list[dict[str, Any]] = []
         last_recorded_status: str | None = None
@@ -543,6 +546,8 @@ class LlamaExtractV2Provider(Provider):
                     # estimate, so it has to survive into the raw result.
                     "metadata": data.get("metadata"),
                     "status": status,
+                    "latency": data.get("latency"),
+                    "metadata_state_transitions": data.get("metadata_state_transitions"),
                     "poll_history": poll_history,
                     "poll_started_at": poll_started_at,
                     "poll_completed_at": datetime.now().isoformat(),
