@@ -413,3 +413,21 @@ all pipelines the same planned order, independent of filesystem discovery order.
 Omit the flag to preserve discovery order. Each inference output directory saves
 `_submission_order.json` with the seed and ordered IDs; cached results are still
 skipped normally. Parallel requests can complete in a different order.
+
+### Limit concurrent source pages
+
+With the `local` (or `runners`) extra installed, add `--max_concurrent_pages 100`
+alongside `--max_concurrent 8` to bound both documents and source PDF pages.
+The default is no page limit. This option requires readable, unencrypted PDFs;
+all source page counts are checked before any submissions.
+
+Admission follows input order (or the seeded shuffle). It waits for the next
+PDF to fit rather than backfilling smaller PDFs. A PDF larger than the page
+budget runs alone. Capacity stays reserved through provider processing,
+polling, and retries; cached documents consume no capacity. Document errors
+are recorded and subsequent documents continue. These limits bound local
+attempts: timed-out remote jobs may still be running after capacity is released.
+
+Each run saves `_admission_plan.json` (limits and source page counts) and
+`_admission_events.jsonl` (timestamped admissions, releases, and active counts).
+These describe client admission, not backend worker capacity.

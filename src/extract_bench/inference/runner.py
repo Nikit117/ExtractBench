@@ -30,6 +30,7 @@ from rich.progress import (
 )
 from rich.table import Table
 
+from extract_bench.inference.page_budget import PageBudget
 from extract_bench.inference.providers.base import (
     Provider,
     ProviderError,
@@ -176,6 +177,7 @@ class InferenceRunner:
         tags: list[str] | None = None,
         per_file_timeout: float | None = None,
         timeout_retries: int = DEFAULT_TIMEOUT_RETRIES,
+        max_concurrent_pages: int | None = None,
     ):
         """
         Initialize the inference runner.
@@ -184,6 +186,7 @@ class InferenceRunner:
         :param pipeline: Pipeline specification
         :param output_dir: Directory to save results
         :param max_concurrent: Maximum concurrent inference requests
+        :param max_concurrent_pages: Optional source PDF page budget; oversized PDFs run alone
         :param save_raw: Whether to save RawInferenceResult JSON files
         :param save_normalized: Whether to save InferenceResult JSON files
         :param force: Force regeneration even if results already exist
@@ -197,6 +200,7 @@ class InferenceRunner:
         self.pipeline = pipeline
         self.output_dir = Path(output_dir)
         self.max_concurrent = max_concurrent
+        self.max_concurrent_pages = max_concurrent_pages
         self.save_raw = save_raw
         self.save_normalized = save_normalized
         self.force = force
@@ -1130,7 +1134,7 @@ class InferenceRunner:
 
     async def _process_test_case_with_semaphore(
         self,
-        semaphore: asyncio.Semaphore,
+        semaphore: asyncio.Semaphore | PageBudget,
         test_case: TestCase,
         product_type: ProductType,
         summary: RunSummary,
@@ -1147,7 +1151,8 @@ class InferenceRunner:
                 progress.update(task_id, advance=1, refresh=True)
             return
 
-        async with semaphore:
+        slot = semaphore.slot(test_case.test_id) if isinstance(semaphore, PageBudget) else semaphore
+        async with slot:
             # Set status to "running" when semaphore is acquired (before processing starts)
             # This allows UI to show "in progress" status immediately
             if self.use_rich and test_case.test_id in self.job_statuses:
@@ -1230,7 +1235,7 @@ class InferenceRunner:
 
     async def _process_with_semaphore(
         self,
-        semaphore: asyncio.Semaphore,
+        semaphore: asyncio.Semaphore | PageBudget,
         pdf_path: Path,
         example_id: str,
         product_type: ProductType,
@@ -1248,7 +1253,8 @@ class InferenceRunner:
                 progress.update(task_id, advance=1, refresh=True)
             return
 
-        async with semaphore:
+        slot = semaphore.slot(example_id) if isinstance(semaphore, PageBudget) else semaphore
+        async with slot:
             # Set status to "running" when semaphore is acquired (before processing starts)
             # This allows UI to show "in progress" status immediately
             if self.use_rich and example_id in self.job_statuses:
@@ -1467,7 +1473,7 @@ class InferenceRunner:
             example_id_fn = default_example_id_fn
 
         # When max_concurrent is 1, run synchronously without asyncio/threads
-        if self.max_concurrent == 1:
+        if self.max_concurrent == 1 and self.max_concurrent_pages is None:
             return self._run_files_sync(pdf_files, product_type, example_id_fn)
 
         self._current_summary = summary = RunSummary()
@@ -1479,7 +1485,16 @@ class InferenceRunner:
                 self.job_statuses[example_id] = JobStatus(example_id=example_id, pdf_path=pdf_path, status="pending")
 
         # Create semaphore for concurrency control
-        semaphore = asyncio.Semaphore(self.max_concurrent)
+        semaphore = (
+            PageBudget(
+                [(example_id_fn(path), path) for path in pdf_files],
+                self.max_concurrent,
+                self.max_concurrent_pages,
+                self.output_dir,
+            )
+            if self.max_concurrent_pages is not None
+            else asyncio.Semaphore(self.max_concurrent)
+        )
 
         # Create progress bar with enhanced styling
         if self.use_rich:
@@ -1719,7 +1734,7 @@ class InferenceRunner:
         test_cases = unique
 
         # When max_concurrent is 1, run synchronously without asyncio/threads
-        if self.max_concurrent == 1:
+        if self.max_concurrent == 1 and self.max_concurrent_pages is None:
             return self._run_test_cases_sync(test_cases, product_type, test_cases_dir)
 
         self._current_summary = summary = RunSummary()
@@ -1742,7 +1757,16 @@ class InferenceRunner:
                 )
 
         # Create semaphore for concurrency control
-        semaphore = asyncio.Semaphore(self.max_concurrent)
+        semaphore = (
+            PageBudget(
+                [(case.test_id, case.file_path) for case in test_cases],
+                self.max_concurrent,
+                self.max_concurrent_pages,
+                self.output_dir,
+            )
+            if self.max_concurrent_pages is not None
+            else asyncio.Semaphore(self.max_concurrent)
+        )
 
         # Create progress bar with enhanced styling
         if self.use_rich:
