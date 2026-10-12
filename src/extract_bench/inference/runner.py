@@ -296,6 +296,23 @@ class InferenceRunner:
         """
         self._thread_pool.shutdown(wait=False, cancel_futures=True)
 
+    def _submit_attempt(self, function: Callable[..., Any], *args: Any) -> concurrent.futures.Future[Any]:
+        """Isolate page-limited attempts so a timed-out thread cannot starve later work.
+
+        Admission already bounds active local attempts. Python cannot kill a
+        running thread, so a timed-out attempt may outlive its reservation;
+        reusing its worker would make later files time out before starting.
+        This matches the per-attempt isolation used by the synchronous runner.
+        """
+        if self.max_concurrent_pages is None:
+            return self._thread_pool.submit(function, *args)
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="inference_attempt")
+        try:
+            return executor.submit(function, *args)
+        finally:
+            # Close to new submissions; the already submitted task still runs.
+            executor.shutdown(wait=False)
+
     def get_current_summary(self) -> RunSummary | None:
         """Get the current run summary (useful for interrupt handling)."""
         return self._current_summary
@@ -1159,13 +1176,13 @@ class InferenceRunner:
                 self.job_statuses[test_case.test_id].status = "running"
                 self.job_statuses[test_case.test_id].started_at = datetime.now()
 
-            # Process test case using our custom thread pool with per-file timeout.
+            # Process each attempt with its own deadline after admission.
             raw_result = None
             normalized_result = None
             error_info: str | tuple[str, str, str] | None = None
 
             for timeout_attempt in range(self.timeout_retries + 1):
-                future = self._thread_pool.submit(self._process_test_case, test_case, product_type)
+                future = self._submit_attempt(self._process_test_case, test_case, product_type)
                 try:
                     outcome = await asyncio.wait_for(
                         asyncio.wrap_future(future),
@@ -1261,13 +1278,13 @@ class InferenceRunner:
                 self.job_statuses[example_id].status = "running"
                 self.job_statuses[example_id].started_at = datetime.now()
 
-            # Process document using our custom thread pool with per-file timeout.
+            # Process each attempt with its own deadline after admission.
             raw_result = None
             normalized_result = None
             error_info: str | tuple[str, str, str] | None = None
 
             for timeout_attempt in range(self.timeout_retries + 1):
-                future = self._thread_pool.submit(self._process_document, pdf_path, example_id, product_type)
+                future = self._submit_attempt(self._process_document, pdf_path, example_id, product_type)
                 try:
                     outcome = await asyncio.wait_for(
                         asyncio.wrap_future(future),
@@ -1739,12 +1756,11 @@ class InferenceRunner:
 
         self._current_summary = summary = RunSummary()
 
-        # Log concurrency setting for debugging
-        # Thread pool is sized to match max_concurrent to avoid default pool bottleneck
+        # Log the client admission limits for debugging.
         print(
             "Starting async run_test_cases with "
             f"max_concurrent={self.max_concurrent} "
-            f"(thread pool size: {self._thread_pool._max_workers})"
+            f"max_concurrent_pages={self.max_concurrent_pages}"
         )
 
         # Initialize job statuses for Rich UI

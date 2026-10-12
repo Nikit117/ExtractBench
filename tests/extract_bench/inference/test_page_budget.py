@@ -67,7 +67,13 @@ def events(path):
 
 @pytest.mark.parametrize(
     "counts,max_docs,max_pages",
-    [([60, 60, 10], 8, 100), ([123, 10, 20], 8, 100), ([10, 10, 10], 2, 100), ([50, 50, 1], 8, 100)],
+    [
+        ([60, 60, 10], 8, 100),
+        ([123, 10, 20], 8, 100),
+        ([60, 101, 10], 8, 100),
+        ([10, 10, 10], 2, 100),
+        ([50, 50, 1], 8, 100),
+    ],
 )
 def test_fifo_limits_and_oversize(tmp_path, counts, max_docs, max_pages):
     cases = pdf_cases(tmp_path, counts)
@@ -215,43 +221,62 @@ def test_cli_forwards_budget_and_single_worker_uses_gate(tmp_path):
     assert all(e["active_documents"] <= 1 for e in log)
 
 
-def test_outer_timeouts_are_recorded_and_remaining_documents_admitted(tmp_path):
+@pytest.mark.parametrize("max_documents", [1, 2])
+@pytest.mark.parametrize("timeout_retries", [0, 1])
+@pytest.mark.parametrize("mode", ["test_cases", "files"])
+def test_healthy_documents_execute_after_stuck_attempt(tmp_path, max_documents, timeout_retries, mode):
     cases = pdf_cases(tmp_path, [1, 1, 1])
     spec = PipelineSpec(pipeline_name="mock", provider_name="fake", product_type=ProductType.EXTRACT, config={})
     release = threading.Event()
+    stopped = threading.Event()
     started = []
 
     class TimeoutRunner(RecordingRunner):
-        def _process_test_case(self, case, product_type):
-            started.append(case.test_id)
-            release.wait(5)
+        def process(self, example_id):
+            started.append(example_id)
+            if example_id == "doc-0" and started.count(example_id) == 1:
+                try:
+                    assert release.wait(5), "test did not release the stuck attempt"
+                finally:
+                    stopped.set()
             return None, None, None
 
+        def _process_test_case(self, case, product_type):
+            return self.process(case.test_id)
+
+        def _process_document(self, path, example_id, product_type):
+            return self.process(example_id)
+
         async def _cancel_inflight_and_drain_async(self, example_id, future, **kwargs):
-            # Model a remote call that does not acknowledge client cancellation.
-            return None
+            await super()._cancel_inflight_and_drain_async(example_id, future, drain_timeout_seconds=0.001)
 
     runner = TimeoutRunner(
         provider=object(),
         pipeline=spec,
         output_dir=tmp_path,
-        max_concurrent=1,
+        max_concurrent=max_documents,
         max_concurrent_pages=100,
         use_rich=False,
         force=True,
-        per_file_timeout=0.02,
-        timeout_retries=0,
+        per_file_timeout=0.1,
+        timeout_retries=timeout_retries,
     )
     try:
-        summary = asyncio.run(runner.run_test_cases(cases, ProductType.EXTRACT))
-        assert started == ["doc-0"]
-        assert summary.successful == 0
-        assert summary.failed == 3
+        if mode == "test_cases":
+            summary = asyncio.run(runner.run_test_cases(cases, ProductType.EXTRACT))
+        else:
+            summary = asyncio.run(runner.run_files([case.file_path for case in cases], ProductType.EXTRACT))
+        assert not stopped.is_set()
+        assert set(started) == {"doc-0", "doc-1", "doc-2"}
+        assert started.count("doc-0") == 1 + timeout_retries
+        assert summary.successful == 2 + timeout_retries
+        assert summary.failed == 1 - timeout_retries
+        assert len(summary.errors) == 1 - timeout_retries
         assert [e["example_id"] for e in events(tmp_path) if e["event"] == "admitted"] == ["doc-0", "doc-1", "doc-2"]
-        assert len(summary.errors) == 3
     finally:
         release.set()
-        runner._thread_pool.shutdown(wait=True)
+        assert stopped.wait(1)
+        runner.shutdown()
 
 
 def test_cached_documents_do_not_take_capacity(tmp_path):
@@ -341,3 +366,93 @@ def test_file_runner_obeys_page_budget(tmp_path):
     log = events(tmp_path)
     assert [e["example_id"] for e in log if e["event"] == "admitted"] == [case.test_id for case in cases]
     assert all(e["active_pages"] <= 100 or e["active_documents"] == 1 for e in log)
+
+
+@pytest.mark.parametrize("failed_event", ["admitted", "released"])
+def test_log_failure_releases_capacity_and_wakes_waiter(tmp_path, failed_event):
+    cases = pdf_cases(tmp_path, [101, 10])
+
+    async def scenario():
+        budget = PageBudget([(c.test_id, c.file_path) for c in cases], 1, 100, tmp_path)
+        original_record = budget._record
+        first_started = asyncio.Event()
+        release = asyncio.Event()
+
+        def record(event, example_id=None):
+            if event == failed_event and example_id == "doc-0":
+                raise OSError("disk full")
+            original_record(event, example_id)
+
+        async def first():
+            async with budget.slot("doc-0"):
+                first_started.set()
+                await release.wait()
+
+        async def second():
+            async with budget.slot("doc-1"):
+                assert (budget.active_documents, budget.active_pages) == (1, 10)
+
+        with patch.object(budget, "_record", side_effect=record):
+            if failed_event == "admitted":
+                with pytest.raises(OSError, match="disk full"):
+                    await first()
+                await asyncio.wait_for(second(), 1)
+            else:
+                task = asyncio.create_task(first())
+                await asyncio.wait_for(first_started.wait(), 1)
+                waiter = asyncio.create_task(second())
+                await asyncio.sleep(0)
+                assert not waiter.done()
+                release.set()
+                with pytest.raises(OSError, match="disk full"):
+                    await task
+                await asyncio.wait_for(waiter, 1)
+        assert budget.active_documents == budget.active_pages == 0
+        assert len(budget.waiting) == 0
+
+    asyncio.run(scenario())
+
+
+def test_resume_archives_previous_admission_sessions(tmp_path):
+    cases = pdf_cases(tmp_path, [1, 1])
+    spec = PipelineSpec(pipeline_name="mock", provider_name="fake", product_type=ProductType.EXTRACT, config={})
+
+    class ResumingRunner(RecordingRunner):
+        cached = set()
+
+        def _is_already_processed(self, example_id):
+            return example_id in self.cached
+
+    runner = ResumingRunner(
+        provider=object(),
+        pipeline=spec,
+        output_dir=tmp_path,
+        max_concurrent=1,
+        max_concurrent_pages=100,
+        use_rich=False,
+    )
+    try:
+        asyncio.run(runner.run_test_cases(cases, ProductType.EXTRACT))
+        first_events = (tmp_path / "_admission_events.jsonl").read_bytes()
+        first_plan = (tmp_path / "_admission_plan.json").read_bytes()
+        runner.cached = {"doc-0"}
+        resumed = asyncio.run(runner.run_test_cases(cases, ProductType.EXTRACT))
+        assert resumed.successful == resumed.skipped == 1
+        assert [e["example_id"] for e in events(tmp_path) if e["event"] == "admitted"] == ["doc-1"]
+        archives = list((tmp_path / "_admission_history").iterdir())
+        assert len(archives) == 1
+        assert (archives[0] / "_admission_events.jsonl").read_bytes() == first_events
+        assert (archives[0] / "_admission_plan.json").read_bytes() == first_plan
+        # An interrupted append is evidence too; preserve it byte for byte.
+        with (tmp_path / "_admission_events.jsonl").open("ab") as log:
+            log.write(b'{"event":')
+        interrupted = (tmp_path / "_admission_events.jsonl").read_bytes()
+        runner.cached = {"doc-0", "doc-1"}
+        complete = asyncio.run(runner.run_test_cases(cases, ProductType.EXTRACT))
+        assert complete.skipped == 2
+        assert events(tmp_path) == []
+        archives = list((tmp_path / "_admission_history").iterdir())
+        assert len(archives) == 2
+        assert {(d / "_admission_events.jsonl").read_bytes() for d in archives} == {first_events, interrupted}
+    finally:
+        runner.shutdown()

@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from uuid import uuid4
 
 
 class PageBudget:
@@ -47,6 +48,14 @@ class PageBudget:
         self.waiting: deque[str] = deque()
         self.condition = asyncio.Condition()
         self.events = output_dir / "_admission_events.jsonl"
+        # Preserve the previous session, including an interrupted JSONL tail,
+        # before creating a new plan/log for a resumed run with cached results.
+        previous = [path for path in (self.events, output_dir / "_admission_plan.json") if path.exists()]
+        if len(previous) > 0:
+            archive = output_dir / "_admission_history" / str(uuid4())
+            archive.mkdir(parents=True)
+            for path in previous:
+                path.rename(archive / path.name)
         self.events.write_text("")
         (output_dir / "_admission_plan.json").write_text(
             json.dumps(
@@ -89,7 +98,12 @@ class PageBudget:
                 )
                 self.active_documents += 1
                 self.active_pages += pages
-                self._record("admitted", example_id)
+                try:
+                    self._record("admitted", example_id)
+                except BaseException:
+                    self.active_documents -= 1
+                    self.active_pages -= pages
+                    raise
             finally:
                 self.waiting.remove(example_id)
                 self.condition.notify_all()
@@ -99,5 +113,7 @@ class PageBudget:
             async with self.condition:
                 self.active_documents -= 1
                 self.active_pages -= pages
-                self._record("released", example_id)
-                self.condition.notify_all()
+                try:
+                    self._record("released", example_id)
+                finally:
+                    self.condition.notify_all()

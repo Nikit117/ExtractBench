@@ -430,4 +430,6 @@ attempts: timed-out remote jobs may still be running after capacity is released.
 
 Each run saves `_admission_plan.json` (limits and source page counts) and
 `_admission_events.jsonl` (timestamped admissions, releases, and active counts).
-These describe client admission, not backend worker capacity.
+Resuming archives the previous plan and event log under `_admission_history/`
+before creating the current session's files, including when cached documents
+are skipped. These describe client admission, not backend worker capacity.
