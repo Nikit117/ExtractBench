@@ -406,6 +406,7 @@ def load_test_case(
             test_rules=test_rules,
             **({"_schema_version": test_config["_schema_version"]} if "_schema_version" in test_config else {}),
             **_row_identity_kwargs(test_config, test_json_path),
+            identity_hints=test_config.get("_identity_hints"),
         )
 
         # Drift check applies only to legacy rules (no v0.2 evidence list):

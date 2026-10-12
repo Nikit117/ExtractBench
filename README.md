@@ -277,6 +277,8 @@ uv run extract-bench evaluation run output/<pipeline_name> --test_cases_dir data
 uv run extract-bench analysis generate_report --evaluation_dir ./output/<pipeline_name>
 ```
 
+For `.test.json` annotations, `_identity_hints` can declare row identity beside `data_schema`, for example `"_identity_hints": {"holdings": ["cusip"]}`. Array-record metrics use these hints to partition top-level arrays only when the residual assignment exceeds 100 million cells after exact-row matching. Each bucket keeps the same cap; smaller assignments remain keyless. Hints are evaluation-only and are not added to the schema sent to providers.
+
 </details>
 
 <details>

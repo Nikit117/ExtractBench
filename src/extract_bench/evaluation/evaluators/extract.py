@@ -37,6 +37,7 @@ from extract_bench.schemas.extract_output import ExtractOutput
 from extract_bench.schemas.pipeline_io import InferenceResult
 from extract_bench.schemas.product import ProductType
 from extract_bench.test_cases.extract_field_paths import parse_field_path
+from extract_bench.test_cases.identity_hints import top_level_identity_fields
 from extract_bench.test_cases.schema import ExtractFieldTestRule, ExtractTestCase, TestCase
 
 
@@ -304,6 +305,7 @@ class ExtractEvaluator(BaseEvaluator):
                     expected=expected_output,
                     actual=extracted_data,
                     data_schema=test_case.data_schema,
+                    identity_keys_by_field=top_level_identity_fields(getattr(test_case, "identity_hints", None)),
                 )
             )
 
