@@ -8,6 +8,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag, field_validator
 
 from extract_bench.schemas.pipeline_io import InputFile
+from extract_bench.test_cases.identity_hints import top_level_identity_fields
 from extract_bench.test_cases.parse_rule_schemas import (
     ParseRule,
     coerce_parse_rule,
@@ -438,6 +439,22 @@ class ExtractTestCase(BaseTestCase):
             "legacy file uses."
         ),
     )
+
+    identity_hints: dict[str, Any] | None = Field(
+        default=None,
+        alias="_identity_hints",
+        description=(
+            "Evaluation-only identity fields by array path. Array-record F1 uses "
+            "top-level hints to partition assignments above its residual cell cap. "
+            "Keep these annotations outside the schema sent to inference providers."
+        ),
+    )
+
+    @field_validator("identity_hints", mode="before")
+    @classmethod
+    def validate_identity_hints(cls, value: Any) -> Any:
+        top_level_identity_fields(value)
+        return value
 
     @property
     def eval_data_schema(self) -> dict[str, Any]:
