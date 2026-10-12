@@ -1,7 +1,9 @@
 """Command-line interface for running inference."""
 
 import asyncio
+import json
 import os
+import random
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -156,6 +158,7 @@ class InferenceCLI:
         per_file_timeout: float | None = None,
         timeout_retries: int = 2,
         force_exit_on_completion: bool = True,
+        shuffle_seed: int | None = None,
     ) -> int:
         """
         Run inference on a directory, auto-detecting structure and requirements.
@@ -181,6 +184,7 @@ class InferenceCLI:
                 per-pipeline value. None (default) → use the pipeline's per_file_timeout,
                 falling back to 600s.
             timeout_retries: Number of retries on per-file timeout (default: 2)
+            shuffle_seed: Reproducible shuffle of sorted test IDs; None preserves input order.
             force_exit_on_completion: Force process exit after inference completes to
                 avoid waiting on zombie provider threads (default: True)
 
@@ -205,6 +209,7 @@ class InferenceCLI:
             per_file_timeout=per_file_timeout,
             timeout_retries=timeout_retries,
             force_exit_on_completion=force_exit_on_completion,
+            shuffle_seed=shuffle_seed,
         )
 
     def _run_test_cases(
@@ -224,6 +229,7 @@ class InferenceCLI:
         per_file_timeout: float | None = None,
         timeout_retries: int = 2,
         force_exit_on_completion: bool = True,
+        shuffle_seed: int | None = None,
     ) -> int:
         """Internal method to run inference on test cases."""
         try:
@@ -329,6 +335,11 @@ class InferenceCLI:
             else:
                 print(f"Loaded {len(unique_cases)} test cases from {test_cases_dir}")
             test_cases = unique_cases
+            if shuffle_seed is not None:
+                if type(shuffle_seed) is not int:
+                    raise ValueError("shuffle_seed must be an integer")
+                test_cases = sorted(test_cases, key=lambda case: case.test_id)
+                random.Random(shuffle_seed).shuffle(test_cases)
 
             # Create provider
             try:
@@ -368,6 +379,17 @@ class InferenceCLI:
                 tags=tags_list,
                 per_file_timeout=per_file_timeout,
                 timeout_retries=timeout_retries,
+            )
+
+            (actual_output_dir / "_submission_order.json").write_text(
+                json.dumps(
+                    {
+                        "shuffle_seed": shuffle_seed,
+                        "example_ids": [case.test_id for case in test_cases],
+                    },
+                    indent=2,
+                )
+                + "\n"
             )
 
             # Run inference on test cases
