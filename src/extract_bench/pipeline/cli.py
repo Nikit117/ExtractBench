@@ -74,6 +74,7 @@ class PipelineCLI:
         open_report: bool = True,
         skip_inference: bool = False,
         test: bool = False,
+        shuffle_seed: int | None = None,
     ) -> int:
         """
         Run the full benchmark pipeline: inference -> evaluation -> report -> open browser.
@@ -86,6 +87,7 @@ class PipelineCLI:
             file: Single file to run (PDF/image). Will use its .test.json if present.
             output_dir: Directory to save results (default: ./output)
             max_concurrent: Maximum concurrent inference requests (default: 20)
+            shuffle_seed: Shuffle sorted test IDs reproducibly; None preserves discovery order.
             force: Force regeneration even if results already exist (default: False)
             verbose: Enable verbose output (default: False)
             group: Optional group name to filter test cases (e.g., 'chart')
@@ -109,6 +111,7 @@ class PipelineCLI:
                 return self._run_single_file(
                     pipeline=pipeline,
                     file_path=Path(file),
+                    shuffle_seed=shuffle_seed,
                     output_dir=Path(output_dir) if output_dir else Path("./output"),
                     force=force,
                     verbose=verbose,
@@ -154,6 +157,7 @@ class PipelineCLI:
                     input_dir=input_path,
                     output_dir=output_base,
                     max_concurrent=max_concurrent,
+                    shuffle_seed=shuffle_seed,
                     force=force,
                     verbose=verbose,
                     group=group,
@@ -426,6 +430,7 @@ class PipelineCLI:
         tags: str | tuple[str, ...] | list[str] | None,
         open_report: bool,
         skip_inference: bool,
+        shuffle_seed: int | None = None,
     ) -> int:
         """Run pipeline on a single file by creating a temporary directory structure."""
         import shutil
@@ -481,6 +486,7 @@ class PipelineCLI:
                     input_dir=temp_path,
                     output_dir=output_dir,
                     max_concurrent=1,  # Single file, no need for concurrency
+                    shuffle_seed=shuffle_seed,
                     force=force,
                     verbose=verbose,
                     tags=tags,

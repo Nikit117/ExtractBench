@@ -404,3 +404,12 @@ src/extract_bench/
 - **HuggingFace Dataset**: [llamaindex/ExtractBench](https://huggingface.co/datasets/llamaindex/ExtractBench)
 - **Code**: [run-llama/ExtractBench](https://github.com/run-llama/ExtractBench)
 - **ParseBench**: [run-llama/ParseBench](https://github.com/run-llama/ParseBench) — A Document Parsing Benchmark for AI Agents
+
+### Reproducible submission order
+
+Pass `--shuffle_seed 0` to `extract-bench run`, `pipeline run`, or `inference run`
+to shuffle test cases after sorting their IDs. The same seed and selected IDs give
+all pipelines the same planned order, independent of filesystem discovery order.
+Omit the flag to preserve discovery order. Each inference output directory saves
+`_submission_order.json` with the seed and ordered IDs; cached results are still
+skipped normally. Parallel requests can complete in a different order.

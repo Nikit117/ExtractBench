@@ -1507,16 +1507,18 @@ class InferenceRunner:
             progress = None
             task_id = None
 
-        # Create tasks
+        # Schedule in input order before as_completed observes completion order.
         tasks = [
-            self._process_with_semaphore(
-                semaphore,
-                pdf_path,
-                example_id_fn(pdf_path),
-                product_type,
-                summary,
-                progress,
-                task_id,
+            asyncio.create_task(
+                self._process_with_semaphore(
+                    semaphore,
+                    pdf_path,
+                    example_id_fn(pdf_path),
+                    product_type,
+                    summary,
+                    progress,
+                    task_id,
+                )
             )
             for pdf_path in pdf_files
         ]
@@ -1768,15 +1770,17 @@ class InferenceRunner:
             progress = None
             task_id = None
 
-        # Create tasks
+        # Schedule in input order before as_completed observes completion order.
         tasks = [
-            self._process_test_case_with_semaphore(
-                semaphore,
-                test_case,
-                product_type,
-                summary,
-                progress,
-                task_id,
+            asyncio.create_task(
+                self._process_test_case_with_semaphore(
+                    semaphore,
+                    test_case,
+                    product_type,
+                    summary,
+                    progress,
+                    task_id,
+                )
             )
             for test_case in test_cases
         ]
