@@ -159,6 +159,7 @@ class InferenceCLI:
         timeout_retries: int = 2,
         force_exit_on_completion: bool = True,
         shuffle_seed: int | None = None,
+        max_concurrent_pages: int | None = None,
     ) -> int:
         """
         Run inference on a directory, auto-detecting structure and requirements.
@@ -173,6 +174,7 @@ class InferenceCLI:
             output_dir: Directory to save inference results (default: './output')
             pipeline_name_override: Pipeline name override (default: uses pipeline name)
             max_concurrent: Maximum concurrent inference requests (default: 20)
+            max_concurrent_pages: Source PDF page budget; oversized documents run alone.
             save_raw: Save raw inference results (default: True)
             save_normalized: Save normalized inference results (default: True)
             force: Force regeneration even if results already exist (default: False)
@@ -199,6 +201,7 @@ class InferenceCLI:
             pipeline=pipeline,
             pipeline_name_override=pipeline_name_override,
             max_concurrent=max_concurrent,
+            max_concurrent_pages=max_concurrent_pages,
             save_raw=save_raw,
             save_normalized=save_normalized,
             force=force,
@@ -230,6 +233,7 @@ class InferenceCLI:
         timeout_retries: int = 2,
         force_exit_on_completion: bool = True,
         shuffle_seed: int | None = None,
+        max_concurrent_pages: int | None = None,
     ) -> int:
         """Internal method to run inference on test cases."""
         try:
@@ -372,6 +376,7 @@ class InferenceCLI:
                 pipeline=pipeline_spec,
                 output_dir=actual_output_dir,
                 max_concurrent=max_concurrent,
+                max_concurrent_pages=max_concurrent_pages,
                 save_raw=save_raw,
                 save_normalized=save_normalized,
                 force=force,
@@ -394,7 +399,7 @@ class InferenceCLI:
 
             # Run inference on test cases
             # When max_concurrent is 1, use sync method directly to avoid async overhead
-            if max_concurrent == 1:
+            if max_concurrent == 1 and max_concurrent_pages is None:
                 summary = runner._run_test_cases_sync(test_cases, product_type_enum, test_cases_dir)
             else:
                 summary = asyncio.run(runner.run_test_cases(test_cases, product_type_enum, test_cases_dir))

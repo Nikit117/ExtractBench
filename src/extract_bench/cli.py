@@ -131,6 +131,7 @@ class BenchCLI:
         skip_inference: bool = False,
         test: bool = False,
         shuffle_seed: int | None = None,
+        max_concurrent_pages: int | None = None,
     ) -> int:
         """Run end-to-end benchmark: inference -> evaluation -> report.
 
@@ -141,6 +142,7 @@ class BenchCLI:
             output_dir: Directory to save results (default: ./output)
             max_concurrent: Maximum concurrent inference requests (default: 20)
             shuffle_seed: Shuffle sorted test IDs reproducibly; None preserves discovery order.
+            max_concurrent_pages: Source PDF page budget; oversized PDFs run alone.
             force: Force regeneration even if results exist (default: False)
             verbose: Enable verbose output (default: False)
             group: Filter by category (e.g., 'short', 'medium', 'long')
@@ -162,6 +164,7 @@ class BenchCLI:
             output_dir=output_dir,
             max_concurrent=max_concurrent,
             shuffle_seed=shuffle_seed,
+            max_concurrent_pages=max_concurrent_pages,
             force=force,
             verbose=verbose,
             group=group,
