@@ -132,6 +132,7 @@ class BenchCLI:
         test: bool = False,
         shuffle_seed: int | None = None,
         max_concurrent_pages: int | None = None,
+        dataset: str = "extractbench",
     ) -> int:
         """Run end-to-end benchmark: inference -> evaluation -> report.
 
@@ -149,6 +150,7 @@ class BenchCLI:
             tags: Tags for this run
             open_report: Open HTML report in browser (default: True)
             skip_inference: Skip inference, only re-evaluate (default: False)
+            dataset: "extractbench" (default) or "pro"; Pro uses ./data-pro and ./output-pro
             test: Download and run on the small test dataset (6 documents: 3 short, 2 medium, 1 long)
 
         Example:
@@ -172,6 +174,7 @@ class BenchCLI:
             open_report=open_report,
             skip_inference=skip_inference,
             test=test,
+            dataset=dataset,
         )
 
     def download(
@@ -179,30 +182,34 @@ class BenchCLI:
         data_dir: str | Path | None = None,
         force: bool = False,
         test: bool = False,
+        dataset: str = "extractbench",
     ) -> int:
         """Download the benchmark dataset from HuggingFace.
 
         Args:
             data_dir: Directory to store dataset (default: ./data)
             force: Force re-download even if data exists
+            dataset: "extractbench" (default) or "pro"; Pro uses ./data-pro and ./output-pro
             test: Download the small test dataset (6 documents: 3 short, 2 medium, 1 long)
 
         Example:
             extract-bench download
             extract-bench download --test
         """
-        return self.data.download(data_dir=data_dir, force=force, test=test)
+        return self.data.download(data_dir=data_dir, force=force, test=test, dataset=dataset)
 
     def status(
         self,
         data_dir: str | Path | None = None,
         test: bool = False,
+        dataset: str = "extractbench",
     ) -> int:
         """Check if the benchmark dataset is downloaded and ready.
 
         Args:
             data_dir: Data directory to check
                 (default: ./data, or ./data/test when --test is set)
+            dataset: "extractbench" (default) or "pro" (./data-pro)
             test: Check the small test dataset instead of the full dataset
 
         Example:
@@ -210,7 +217,7 @@ class BenchCLI:
             extract-bench status --test
             extract-bench status data/
         """
-        return self.data.status(data_dir=data_dir, test=test)
+        return self.data.status(data_dir=data_dir, test=test, dataset=dataset)
 
     def pipelines(
         self,

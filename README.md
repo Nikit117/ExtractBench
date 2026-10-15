@@ -12,6 +12,8 @@ A schema defines one extraction task, and all documents of that type share it: o
 
 The benchmark covers **370 documents (4,869 pages)** across 8 business domains and 67 document types, each type with its own schema. Every document is tagged along five independent axes: task challenge, perception challenge, table structure, length, and business domain, so a low score can be traced to its cause.
 
+For the harder 100-document extension, see [ExtractBench Pro](#extractbench-pro).
+
 <p align="center">
   <img src="docs/extractbench_teaser.png" alt="ExtractBench: JSON Schema and document in; JSON plus evidence out; scored on value F1, grounding F1, challenge tags, and cost" width="100%">
 </p>
@@ -204,6 +206,32 @@ uv run extract-bench download --test
 uv run extract-bench status
 ```
 
+## ExtractBench Pro
+
+[ExtractBench Pro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) contains 100 documents across six challenges: document conventions, house vocabulary, house counting rules, drawn relations, charts inside documents, and long chart sheets. It uses the same evaluator as ExtractBench.
+
+Download the PDFs, schemas, ground truth, and scoring rules into the layout the harness reads:
+
+```bash
+git clone https://github.com/run-llama/ExtractBench
+cd ExtractBench
+uv sync
+uv run extract-bench download --dataset pro
+uv run extract-bench status --dataset pro
+```
+
+Pro is stored in `data-pro/`, separate from original ExtractBench in `data/`. Each challenge has its own directory, with a `.pdf` and `.test.json` for each document. The download manifest records the Hugging Face revision. Re-running `download` resumes an incomplete download or refreshes a changed dataset.
+
+To evaluate a system, install its provider extra and set its API key as described in [Configuration](#configuration). For example:
+
+```bash
+uv sync --extra llamaextract
+uv run extract-bench run llamaextract_agentic --dataset pro
+uv run extract-bench serve output-pro/llamaextract_agentic
+```
+
+Inference calls the selected provider's paid API. `run --dataset pro` downloads the dataset automatically if needed and keeps results in `output-pro/`, separate from original ExtractBench results. To run just one challenge, add `--group house_vocabulary` (or another challenge name from the [dataset card](https://huggingface.co/datasets/llamaindex/ExtractBenchPro#challenge-subsets)). Pro does not currently have a `--test` subset.
+
 ## Metrics
 
 ExtractBench reports one metric for value accuracy and two for grounding. We score the grounding metrics only on fields that carry verified box ground truth.
@@ -325,8 +353,8 @@ ExtractBench does not use LLM-as-a-judge; all value scoring is deterministic. Yo
 | Command | Description |
 |---------|-------------|
 | `extract-bench run` | Evaluate an extraction system end-to-end (inference + evaluation + reports) |
-| `extract-bench download` | Download the benchmark dataset from HuggingFace |
-| `extract-bench status` | Check whether the dataset has been downloaded |
+| `extract-bench download` | Download original ExtractBench; add `--dataset pro` for Pro |
+| `extract-bench status` | Check dataset readiness (`--dataset pro` for Pro) |
 | `extract-bench pipelines` | List extraction pipelines (`--parse`, `--layout`, `--all` for the rest) |
 | `extract-bench compare` | Compare results from two systems side-by-side |
 | `extract-bench leaderboard` | Generate a leaderboard across all evaluated systems |

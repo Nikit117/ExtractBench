@@ -9,7 +9,7 @@ import fire
 from extract_bench.analysis.aggregation_report import generate_aggregation_report
 from extract_bench.analysis.cli import AnalysisCLI
 from extract_bench.analysis.leaderboard_report import generate_leaderboard_report
-from extract_bench.data.download import default_data_dir, download_dataset, is_dataset_ready
+from extract_bench.data.download import dataset_config, default_data_dir, download_dataset, is_dataset_ready
 from extract_bench.evaluation.cli import EvaluationCLI
 from extract_bench.inference.cli import InferenceCLI
 from extract_bench.utils.browser import open_browser
@@ -76,6 +76,7 @@ class PipelineCLI:
         test: bool = False,
         shuffle_seed: int | None = None,
         max_concurrent_pages: int | None = None,
+        dataset: str = "extractbench",
     ) -> int:
         """
         Run the full benchmark pipeline: inference -> evaluation -> report -> open browser.
@@ -96,6 +97,7 @@ class PipelineCLI:
             tags: Tags for this run - comma-separated string or list
             open_report: Open the HTML report in browser when done (default: True)
             skip_inference: Skip inference step, only run evaluation and report (default: False)
+            dataset: "extractbench" (default) or "pro"; Pro uses ./data-pro and ./output-pro
             test: Download and run on the small test dataset (6 documents: 3 short, 2 medium, 1 long)
 
         Returns:
@@ -108,6 +110,10 @@ class PipelineCLI:
             extract-bench run llamaextract_agentic --test
         """
         try:
+            dataset_config(dataset, test)
+            output_base = (
+                Path(output_dir) if output_dir is not None else Path("./output-pro" if dataset == "pro" else "./output")
+            )
             # Handle single file mode
             if file is not None:
                 return self._run_single_file(
@@ -115,7 +121,7 @@ class PipelineCLI:
                     file_path=Path(file),
                     shuffle_seed=shuffle_seed,
                     max_concurrent_pages=max_concurrent_pages,
-                    output_dir=Path(output_dir) if output_dir else Path("./output"),
+                    output_dir=output_base,
                     force=force,
                     verbose=verbose,
                     tags=tags,
@@ -132,18 +138,17 @@ class PipelineCLI:
             # silently scribble HuggingFace files into the user's directory.
             input_dir_explicit = input_dir is not None
             if input_dir is None:
-                input_dir = default_data_dir(test=test)
+                input_dir = default_data_dir(test=test, dataset=dataset)
 
             input_path = Path(input_dir)
-            output_base = Path(output_dir) if output_dir else Path("./output")
             pipeline_output_dir = output_base / pipeline
 
             # Auto-download dataset only when using the default location.
-            if not input_dir_explicit and not is_dataset_ready(input_path):
+            if not input_dir_explicit and not is_dataset_ready(input_path, dataset=dataset, test=test):
                 label = "test dataset" if test else "dataset"
                 print(f"{label.capitalize()} not found at {input_path}, downloading from HuggingFace...")
                 try:
-                    download_dataset(data_dir=input_path, test=test)
+                    download_dataset(data_dir=input_path, test=test, dataset=dataset)
                 except Exception as e:
                     print(f"Error downloading dataset: {e}", file=sys.stderr)
                     return 1

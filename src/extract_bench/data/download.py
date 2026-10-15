@@ -1,6 +1,7 @@
-"""Download the ExtractBench dataset from HuggingFace.
+"""Download original ExtractBench or ExtractBench Pro from HuggingFace.
 
-Dataset: https://huggingface.co/datasets/llamaindex/ExtractBench
+Datasets: https://huggingface.co/datasets/llamaindex/ExtractBench
+          https://huggingface.co/datasets/llamaindex/ExtractBenchPro
 
 The hub stores one JSONL row per (document, schema) test case plus the source
 documents under ``docs/<split>/``. After download, each row is reconstructed
@@ -22,6 +23,8 @@ from __future__ import annotations
 
 import json
 import shutil
+from collections.abc import Set
+from dataclasses import dataclass
 from pathlib import Path
 
 DATASET_REPO = "llamaindex/ExtractBench"
@@ -36,19 +39,47 @@ SPLITS = ["short", "medium", "long"]
 DEFAULT_DATA_DIR = Path("./data")
 DEFAULT_TEST_DATA_DIR = Path("./data/test")
 
-# Written after a fully successful reconstruction; records the resolved HF
-# revision and per-split case counts so `is_dataset_ready` can distinguish a
-# complete download from an interrupted one.
+
+@dataclass(frozen=True)
+class Dataset:
+    repo: str
+    splits: tuple[str, ...]
+    data_dir: Path
+
+
+def dataset_config(dataset: str = "extractbench", test: bool = False) -> Dataset:
+    if dataset == "extractbench":
+        return Dataset(DATASET_REPO, tuple(SPLITS), DEFAULT_TEST_DATA_DIR if test else DEFAULT_DATA_DIR)
+    if dataset == "pro":
+        if test:
+            raise ValueError("ExtractBench Pro has no --test subset. Use --group to run one challenge.")
+        return Dataset(
+            "llamaindex/ExtractBenchPro",
+            (
+                "document_conventions",
+                "house_vocabulary",
+                "house_counting_rules",
+                "drawn_relations",
+                "charts_inside_documents",
+                "long_chart_sheets",
+            ),
+            Path("./data-pro"),
+        )
+    raise ValueError(f"Unknown dataset {dataset!r}. Choose 'extractbench' or 'pro'.")
+
+
+# Records dataset ownership and the resolved HF revision. Per-split counts are
+# filled only after reconstruction, so interrupted downloads remain not-ready.
 MANIFEST_NAME = ".extract_bench_manifest.json"
 
 
-def default_data_dir(test: bool = False) -> Path:
+def default_data_dir(test: bool = False, dataset: str = "extractbench") -> Path:
     """Return the default on-disk dataset path for the given mode.
 
     Used by every CLI surface that takes ``--test`` so the routing is
     consistent between ``download``, ``run`` and ``status``.
     """
-    return DEFAULT_TEST_DATA_DIR if test else DEFAULT_DATA_DIR
+    return dataset_config(dataset, test).data_dir
 
 
 def read_manifest(data_dir: Path) -> dict | None:
@@ -63,41 +94,45 @@ def read_manifest(data_dir: Path) -> dict | None:
     return manifest if isinstance(manifest, dict) else None
 
 
-def is_dataset_ready(data_dir: Path) -> bool:
+def is_dataset_ready(data_dir: Path, dataset: str = "extractbench", test: bool = False) -> bool:
     """True when the manifest exists and every split has all recorded sidecars.
 
-    An interrupted reconstruction leaves no manifest (it is written last), so
-    partial downloads report not-ready and get repaired by the next download.
+    An interrupted reconstruction leaves an incomplete manifest, so partial
+    downloads report not-ready and get repaired by the next download.
     """
+    config = dataset_config(dataset, test)
     if not data_dir.exists():
         return False
     manifest = read_manifest(data_dir)
-    if manifest is None:
+    if manifest is None or manifest.get("repo") != config.repo or manifest.get("test") is not test:
         return False
     per_split = manifest.get("per_split")
     if not isinstance(per_split, dict):
         return False
-    for split in SPLITS:
+    for split in config.splits:
         split_dir = data_dir / split
         expected = per_split.get(split)
-        if not isinstance(expected, int):
+        if type(expected) is not int or expected <= 0:
             return False
-        if not split_dir.exists() or sum(1 for _ in split_dir.rglob("*.test.json")) < expected:
+        sidecars = list(split_dir.rglob("*.test.json"))
+        if len(sidecars) != expected:
+            return False
+        if any(not path.with_name(path.name.removesuffix(".test.json") + ".pdf").is_file() for path in sidecars):
             return False
     return True
 
 
-def _remote_revision(revision: str | None) -> str | None:
+def _remote_revision(revision: str | None, dataset: str = "extractbench") -> str | None:
     """Resolve ``revision`` to a commit sha, or None when the Hub is unreachable."""
     try:
         from huggingface_hub import HfApi
 
-        return HfApi().repo_info(DATASET_REPO, repo_type=DATASET_REPO_TYPE, revision=revision).sha
+        return HfApi().repo_info(dataset_config(dataset).repo, repo_type=DATASET_REPO_TYPE, revision=revision).sha
     except Exception:
         return None
 
 
-def _revision_is_stale(data_dir: Path, revision: str | None) -> bool:
+def _revision_is_stale(data_dir: Path, revision: str | None, dataset: str = "extractbench") -> bool:
     """True when the Hub has moved past the commit recorded in the manifest.
 
     Case counts alone cannot detect this: a branch can swap which documents it
@@ -108,14 +143,14 @@ def _revision_is_stale(data_dir: Path, revision: str | None) -> bool:
     local = (manifest or {}).get("revision")
     if not isinstance(local, str):
         return False
-    remote = _remote_revision(revision)
+    remote = _remote_revision(revision, dataset)
     return remote is not None and remote != local
 
 
-def _prune_orphans(data_dir: Path, keep: set[Path]) -> list[Path]:
+def _prune_orphans(data_dir: Path, keep: Set[Path], dataset: str = "extractbench") -> list[Path]:
     """Delete reconstructed sidecars (and their PDFs) no longer in the dataset."""
     removed = []
-    for split in SPLITS:
+    for split in dataset_config(dataset).splits:
         split_dir = data_dir / split
         if not split_dir.is_dir():
             continue
@@ -180,6 +215,7 @@ def download_dataset(
     data_dir: Path | None = None,
     force: bool = False,
     test: bool = False,
+    dataset: str = "extractbench",
 ) -> Path:
     """Download the ExtractBench dataset and reconstruct the sidecar layout.
 
@@ -192,16 +228,17 @@ def download_dataset(
             Defaults to ./data (or ./data/test when ``test`` is set).
         force: Re-reconstruct (overwriting existing files) even if data
             already exists.
-        test: Download the small test dataset (a few files per split)
-            instead of the full dataset.
+        test: Download the small original ExtractBench test dataset.
+        dataset: "extractbench" (default) or "pro". Pro defaults to ./data-pro.
 
     Returns:
         Path to the reconstructed dataset directory.
     """
     from huggingface_hub import snapshot_download
 
+    config = dataset_config(dataset, test)
     if data_dir is None:
-        data_dir = default_data_dir(test=test)
+        data_dir = config.data_dir
 
     # Two branches, same as ParseBench: the full dataset lives on the default
     # branch, the small smoke subset on `test-data`. The resolved commit is
@@ -209,6 +246,10 @@ def download_dataset(
     revision = TEST_DATA_REVISION if test else None
 
     existing_manifest = read_manifest(data_dir)
+    if existing_manifest is not None and existing_manifest.get("repo") != config.repo:
+        raise RuntimeError(
+            f"{data_dir} belongs to {existing_manifest.get('repo')!r}, not {config.repo}. Use a different --data_dir."
+        )
     if existing_manifest is not None and existing_manifest.get("test") != test:
         kind_existing = "test subset" if existing_manifest.get("test") else "full dataset"
         kind_requested = "test subset" if test else "full dataset"
@@ -217,30 +258,43 @@ def download_dataset(
             f"{kind_requested} into the same directory. Use a different --data_dir."
         )
 
-    if not force and is_dataset_ready(data_dir) and not _revision_is_stale(data_dir, revision):
+    if not force and is_dataset_ready(data_dir, dataset, test) and not _revision_is_stale(data_dir, revision, dataset):
         print(f"Dataset already downloaded at: {data_dir}")
         return data_dir
 
     label = "test dataset" if test else "dataset"
-    print(f"Downloading {label} from HuggingFace: {DATASET_REPO}")
+    print(f"Downloading {label} from HuggingFace: {config.repo}")
     if revision:
         print(f"Branch: {revision}")
     print(f"Destination: {data_dir}")
 
     snapshot_dir = Path(
         snapshot_download(
-            repo_id=DATASET_REPO,
+            repo_id=config.repo,
             repo_type=DATASET_REPO_TYPE,
             revision=revision,
+            allow_patterns=[*[f"{split}.jsonl" for split in config.splits], "docs/**"],
         )
     )
     # huggingface_hub materializes snapshots under snapshots/<commit-sha>/.
     resolved_revision = snapshot_dir.name
+    refresh = (
+        force
+        or not is_dataset_ready(data_dir, dataset, test)
+        or (existing_manifest is not None and existing_manifest.get("revision") != resolved_revision)
+    )
+    # Keep dataset ownership through interruptions, but certify readiness only
+    # after every split has been reconstructed from this snapshot.
+    data_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / MANIFEST_NAME).write_text(
+        json.dumps({"repo": config.repo, "revision": resolved_revision, "test": test, "per_split": {}}),
+        encoding="utf-8",
+    )
 
     n_cases = 0
     per_split: dict[str, int] = {}
     written: set[Path] = set()
-    for split in SPLITS:
+    for split in config.splits:
         jsonl_path = snapshot_dir / f"{split}.jsonl"
         if not jsonl_path.exists():
             raise RuntimeError(f"Dataset snapshot is missing {split}.jsonl at {snapshot_dir}")
@@ -249,20 +303,23 @@ def download_dataset(
         for line in jsonl_path.read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue
-            written.add(_write_sidecar(json.loads(line), split_dir, snapshot_dir, force=force))
+            row = json.loads(line)
+            if row["category"] != split:
+                raise ValueError(f"Row {row.get('id')} in {split}.jsonl has category {row['category']!r}")
+            written.add(_write_sidecar(row, split_dir, snapshot_dir, force=refresh))
             split_cases += 1
         per_split[split] = split_cases
         n_cases += split_cases
 
-    orphans = _prune_orphans(data_dir, written)
+    orphans = _prune_orphans(data_dir, written, dataset)
     if orphans:
         print(f"Removed {len(orphans)} document(s) no longer in the dataset:")
         for path in orphans:
             print(f"  - {path.relative_to(data_dir)}")
 
-    # Written last: its presence certifies a complete reconstruction.
+    # Complete counts are written last, after all sidecars and PDFs are in place.
     manifest = {
-        "repo": DATASET_REPO,
+        "repo": config.repo,
         "revision": resolved_revision,
         "test": test,
         "cases": n_cases,
@@ -270,7 +327,7 @@ def download_dataset(
     }
     (data_dir / MANIFEST_NAME).write_text(json.dumps(manifest, indent=1), encoding="utf-8")
 
-    if not is_dataset_ready(data_dir):
+    if not is_dataset_ready(data_dir, dataset, test):
         raise RuntimeError(f"Dataset download completed but validation failed. Check {data_dir} for missing files.")
 
     print(f"Dataset ready at: {data_dir} ({n_cases} test cases, revision {resolved_revision[:12]})")

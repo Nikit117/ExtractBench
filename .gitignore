@@ -225,3 +225,6 @@ data/
 !src/extract_bench/data/
 output/
 results/
+# Pro lives outside data/ so original runs cannot recursively pick it up.
+/data-pro/
+/output-pro/
