@@ -12,7 +12,7 @@ A schema defines one extraction task, and all documents of that type share it: o
 
 The benchmark covers **370 documents (4,869 pages)** across 8 business domains and 67 document types, each type with its own schema. Every document is tagged along five independent axes: task challenge, perception challenge, table structure, length, and business domain, so a low score can be traced to its cause.
 
-For the harder 100-document extension, see [ExtractBench Pro](#extractbench-pro).
+Read the [ExtractBench launch post](https://www.llamaindex.ai/blog/introducing-extractbench) for the design and results. For the harder 100-document extension, see [ExtractBench Pro](#extractbench-pro).
 
 <p align="center">
   <img src="docs/extractbench_teaser.png" alt="ExtractBench: JSON Schema and document in; JSON plus evidence out; scored on value F1, grounding F1, challenge tags, and cost" width="100%">
@@ -208,7 +208,7 @@ uv run extract-bench status
 
 ## ExtractBench Pro
 
-[ExtractBench Pro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) contains 100 documents across six challenges: document conventions, house vocabulary, house counting rules, drawn relations, charts inside documents, and long chart sheets. It uses the same evaluator as ExtractBench.
+[ExtractBench Pro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) contains 100 documents across six challenges: document conventions, house vocabulary, house counting rules, drawn relations, charts inside documents, and long chart sheets. It uses the same evaluator as ExtractBench. Read the [ExtractBench Pro launch post](https://www.llamaindex.ai/blog/introducing-extractbench-pro) for the challenges and results.
 
 Download the PDFs, schemas, ground truth, and scoring rules into the layout the harness reads:
 
