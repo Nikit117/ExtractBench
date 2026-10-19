@@ -14,6 +14,8 @@ _RAW_OUTPUT_STATS: list[tuple[str, str]] = [
     ("credits_per_page", "credits/page"),
     ("parse_credits", "credits"),
     ("extract_credits", "credits"),
+    ("agent_usage_credits", "credits"),
+    ("agent_usage_usd", "$"),
     ("total_credits", "credits"),
     ("num_pages_billed", "pages"),
     ("cost_usd", "$"),

@@ -45,8 +45,11 @@ DATALAB_PARSE_COST_PER_PAGE_USD = {
 }
 DATALAB_EXTRACT_COST_PER_PAGE_USD = {
     "fast": 0.006,
-    "balanced": 0.025,
+    "balanced": 0.015,
+    "accurate": 0.02,
 }
+#: polls at the default 1 s interval: 2 hours, so the runner's per-file timeout, not this budget, ends a slow job
+DEFAULT_MAX_POLLS = 7200
 
 
 @register_provider("datalab_extract")
@@ -71,7 +74,8 @@ class DatalabExtractProvider(Provider):
             - ``api_key``: Datalab API key (defaults to DATALAB_API_KEY env var)
             - ``parse_mode``: Document parse mode — ``fast`` / ``balanced`` /
               ``accurate``. Falls back to ``mode`` for legacy configs.
-            - ``extraction_mode``: Extraction mode — ``fast`` / ``balanced``.
+            - ``extraction_mode``: Extraction mode — ``fast`` / ``balanced`` /
+              ``accurate``.
               Datalab documents this as a raw form field; the SDK does not expose
               it as a typed ``ExtractOptions`` attribute.
             - ``max_pages``: Maximum number of pages to process (optional).
@@ -83,9 +87,10 @@ class DatalabExtractProvider(Provider):
             - ``save_checkpoint``: Save a checkpoint after processing.
             - ``skip_cache``: Bypass server-side cache (default: False).
             - ``max_polls``: Polling budget passed to the SDK
-              (SDK default is 300 = 5 minutes at 1s/poll). Slow modes like
-              ``accurate`` can exceed that on multi-page docs, so the bench
-              provider defaults to 900 (15 minutes).
+              (SDK default is 300 = 5 minutes at 1s/poll). The runner's
+              per-file timeout is the deadline every pipeline shares, so the
+              bench provider defaults to ``DEFAULT_MAX_POLLS`` (2 hours), longer
+              than any per-file timeout a benchmark run sets.
             - ``poll_interval``: Seconds between polls (default: 1, SDK default).
         """
         super().__init__(provider_name, base_config)
@@ -115,7 +120,7 @@ class DatalabExtractProvider(Provider):
         self._output_format = self.base_config.get("output_format", "json")
         self._save_checkpoint = self.base_config.get("save_checkpoint", False)
         self._skip_cache = self.base_config.get("skip_cache", False)
-        self._max_polls = int(self.base_config.get("max_polls", 900))
+        self._max_polls = int(self.base_config.get("max_polls", DEFAULT_MAX_POLLS))
         self._poll_interval = int(self.base_config.get("poll_interval", 1))
 
     async def _extract_pdf_async(self, pdf_path: str, schema: dict[str, Any]) -> dict[str, Any]:
@@ -167,6 +172,7 @@ class DatalabExtractProvider(Provider):
                     parse_mode=self._parse_mode,
                     extraction_mode=self._extraction_mode,
                 )
+                _promote_api_cost_breakdown(raw_response)
             else:
                 # Legacy configs did not pin extraction_mode. Preserve the API
                 # reported cost when available instead of guessing the account

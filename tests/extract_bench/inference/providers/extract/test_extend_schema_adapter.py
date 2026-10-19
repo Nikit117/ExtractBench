@@ -7,9 +7,10 @@ pytest.importorskip("extend_ai", reason="dev and runners extras required; run: u
 from extract_bench.inference.providers.extract.extend import _adapt_schema_for_extend
 
 
-def test_extend_schema_adapter_collapses_nullable_scalar_unions() -> None:
+def test_extend_schema_adapter_preserves_nullable_scalar_unions() -> None:
     schema = {
         "type": "object",
+        "required": ["contract_number"],
         "properties": {
             "contract_number": {
                 "anyOf": [{"type": "string"}, {"type": "null"}],
@@ -26,20 +27,22 @@ def test_extend_schema_adapter_collapses_nullable_scalar_unions() -> None:
 
     adapted, primitive_array_paths, _renamed = _adapt_schema_for_extend(schema)
 
+    assert adapted["required"] == ["contract_number"]
     assert primitive_array_paths == {}
     assert adapted["properties"]["contract_number"] == {
-        "type": "string",
+        "type": ["string", "null"],
         "description": "Contract number.",
     }
     assert adapted["properties"]["page_count"] == {
-        "type": "integer",
+        "type": ["integer", "null"],
         "description": "Nullable integer encoded with a JSON Schema type list.",
     }
 
 
-def test_extend_schema_adapter_collapses_nullable_arrays_before_array_adaptation() -> None:
+def test_extend_schema_adapter_keeps_nullable_containers_optional() -> None:
     schema = {
         "type": "object",
+        "required": ["codes", "line_items"],
         "properties": {
             "codes": {
                 "anyOf": [
@@ -75,6 +78,7 @@ def test_extend_schema_adapter_collapses_nullable_arrays_before_array_adaptation
 
     adapted, primitive_array_paths, _renamed = _adapt_schema_for_extend(schema)
 
+    assert adapted["required"] == []
     assert primitive_array_paths == {"codes": ["string"]}
     assert adapted["properties"]["codes"] == {
         "type": "array",
@@ -87,7 +91,7 @@ def test_extend_schema_adapter_collapses_nullable_arrays_before_array_adaptation
             "type": "object",
             "properties": {
                 "description": {
-                    "type": "string",
+                    "type": ["string", "null"],
                 }
             },
         },
@@ -128,7 +132,7 @@ def test_extend_schema_adapter_resolves_nullable_ref_unions() -> None:
         "type": "object",
         "properties": {
             "name": {
-                "type": "string",
+                "type": ["string", "null"],
             }
         },
         "description": "Optional party object.",

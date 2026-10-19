@@ -21,6 +21,7 @@ _PROVIDER_MODULES = [
     "deepseek_extract",
     "deepseek_oneshot_extract",
     "extend",
+    "extend_operator",
     "gemini_direct",
     "glm_extract",
     "glm_zai_extract",

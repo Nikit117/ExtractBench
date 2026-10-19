@@ -6,16 +6,20 @@ prompted to read it agentically and write ``./output.json`` against the benchmar
 schema, and the extraction + cost are read back from the ``stream-json`` trace.
 
 The CLI's terminal ``{"type":"result"}`` event carries ``total_cost_usd``, so no
-pricing table is needed. Per-document spend is bounded by three layered controls,
-all driven by ``max_cost_usd`` / ``timeout_s``:
+pricing table is needed. Per-document spend is bounded by two controls, both
+driven by ``max_cost_usd``:
 
 1. ``--max-budget-usd`` — native CLI hard dollar cap (the deterministic backstop;
    the CLI itself stops spending past it). Passed only when ``max_cost_usd`` is set.
-2. ``timeout_s`` — wall-clock kill enforced by the provider.
-3. streaming ``max_cost_usd`` guard — the provider reads the ``stream-json`` stdout
+2. streaming ``max_cost_usd`` guard — the provider reads the ``stream-json`` stdout
    incrementally and terminates the subprocess the instant accumulated interim cost
    crosses the cap (belt-and-suspenders over (1), plus ``cost_exceeded_budget``
    reporting on the terminal event).
+
+Each document gets one run, with no time limit of its own: the runner does not retry
+it, and only the run's per-file timeout stops it (the runner then kills the CLI via
+``cancel``). A provider-side limit used to kill a run at 20 minutes and the runner
+restarted the document from zero, while latency and cost kept only the last run.
 
 Note: CLI v2.1.x dropped ``--max-turns``; ``--max-budget-usd`` is the supported
 spend backstop, so the loop is bounded by dollars rather than turn count.
@@ -29,7 +33,6 @@ import shutil
 import subprocess
 import tempfile
 import threading
-import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -91,12 +94,11 @@ class ClaudeCodeExtractProvider(Provider):
     """
 
     DEFAULT_MODEL = "claude-opus-4-8"
-    DEFAULT_TIMEOUT_S = 1200  # 20 min/doc; overridable via config["timeout_s"]
+    retries_transient_errors = False  # one run per document (see module docstring)
 
     def __init__(self, provider_name: str, base_config: dict[str, Any] | None = None):
         super().__init__(provider_name, base_config)
         self._model: str = self.base_config.get("model", self.DEFAULT_MODEL)
-        self._timeout_s: int = int(self.base_config.get("timeout_s", self.DEFAULT_TIMEOUT_S))
         # Cost controls (see module docstring):
         self._max_cost_usd: float | None = self.base_config.get("max_cost_usd")
         self._claude_bin: str = self.base_config.get("claude_bin", "claude")
@@ -239,13 +241,13 @@ class ClaudeCodeExtractProvider(Provider):
     # Subprocess execution + streaming budget guard
     # ------------------------------------------------------------------
     def _run_cli(self, cmd: list[str], workdir: Path, example_id: str, lines: list[str]) -> tuple[int, str]:
-        """Run the CLI, streaming stdout and enforcing the cost/time budgets.
+        """Run the CLI, streaming stdout and enforcing the cost budget.
 
         Appends stream-json stdout lines into the caller-owned ``lines`` buffer
-        (so a partial trace survives timeout/budget kills) and returns
-        ``(returncode, stderr_tail)``. Raises:
+        (so a partial trace survives a budget kill) and returns
+        ``(returncode, stderr_tail)``. There is no time limit here: the runner's
+        per-file timeout cancels the run. Raises:
         - ``ProviderConfigError`` if the ``claude`` binary is missing.
-        - ``ProviderTransientError`` on wall-clock timeout.
         - ``ProviderPermanentError`` if the streaming cost crosses ``max_cost_usd``.
         """
         env = {**os.environ}
@@ -255,7 +257,7 @@ class ClaudeCodeExtractProvider(Provider):
         # stderr -> file sink, never a PIPE. With --verbose always on, the CLI can
         # emit more diagnostics than the OS pipe buffer (~64 KB) holds; an undrained
         # stderr PIPE would block the child mid-write, stall our stdout loop, and
-        # hang until the deadline. A file has no such limit. Mirrors the local
+        # hang until the per-file timeout. A file has no such limit. Mirrors the local
         # llamaparse/llamaextract subprocess providers. We keep the tail for debugging.
         stderr_path = workdir / "claude_stderr.log"
         try:
@@ -283,15 +285,10 @@ class ClaudeCodeExtractProvider(Provider):
                 self._procs[example_id] = proc
 
             running_cost: float | None = None
-            deadline = time.monotonic() + self._timeout_s
 
             try:
                 assert proc.stdout is not None
                 for raw_line in proc.stdout:
-                    if time.monotonic() > deadline:
-                        self._terminate(proc)
-                        raise subprocess.TimeoutExpired(cmd, self._timeout_s)
-
                     line = raw_line.rstrip("\n")
                     if not line:
                         continue
@@ -316,17 +313,8 @@ class ClaudeCodeExtractProvider(Provider):
                                 "subprocess terminated mid-run. Not retriable."
                             )
 
-                # Stream drained naturally; reap the process and surface a hang as a timeout.
-                try:
-                    remaining = max(1.0, deadline - time.monotonic())
-                    proc.wait(timeout=remaining)
-                except subprocess.TimeoutExpired:
-                    self._terminate(proc)
-                    raise
-            except subprocess.TimeoutExpired as e:
-                raise ProviderTransientError(
-                    f"claude_code_extract timed out after {self._timeout_s}s; subprocess killed."
-                ) from e
+                # Stream drained naturally; reap the process.
+                proc.wait()
             finally:
                 with self._procs_lock:
                     self._procs.pop(example_id, None)
@@ -481,7 +469,6 @@ class ClaudeCodeExtractProvider(Provider):
     def _config_snapshot(self) -> dict[str, Any]:
         return {
             "model": self._model,
-            "timeout_s": self._timeout_s,
             "max_cost_usd": self._max_cost_usd,
             "bare": self._bare,
             "non_zdr": self._non_zdr,

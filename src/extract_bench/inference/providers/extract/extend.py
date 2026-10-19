@@ -145,28 +145,65 @@ def _adapt_schema_for_extend(
         return isinstance(node, dict) and node.get("type") == "null"
 
     def normalize_nullable_schema(node: dict[str, Any]) -> dict[str, Any]:
-        """Collapse nullable unions to the non-null schema shape Extend accepts."""
+        """Preserve nullable primitives in the type-list shape Extend accepts."""
         node_type = node.get("type")
+        # Extend rejects nullable container types. Container optionality is
+        # retained by leaving these properties out of their parent's required.
         if isinstance(node_type, list):
-            non_null_types = [value for value in node_type if value != "null"]
-            if len(non_null_types) == 1:
-                return {**node, "type": non_null_types[0]}
-
+            if "array" in node_type or "object" in node_type:
+                return {**node, "type": "array" if "array" in node_type else "object"}
         for union_key in ("anyOf", "oneOf"):
             options = node.get(union_key)
             if not isinstance(options, list):
                 continue
             non_null_options = [option for option in options if not is_null_schema(option)]
-            if len(non_null_options) != 1 or len(non_null_options) == len(options):
+            nullable = len(non_null_options) < len(options)
+            if len(non_null_options) == 1:
+                result = dict(resolve_ref_node(non_null_options[0]))
+            else:
+                types = [option.get("type") if isinstance(option, dict) else None for option in non_null_options]
+                if not (
+                    "string" in types
+                    and ("number" in types or "integer" in types)
+                    and all(value in ("string", "number", "integer") for value in types)
+                ):
+                    continue
+                # Extend cannot express mixed number/string primitives. Text
+                # preserves quantities such as both 12 and "as needed".
+                result = {"type": "string"}
+            if "type" not in result:
                 continue
-
-            result = dict(non_null_options[0])
+            if nullable and result["type"] not in ("array", "object"):
+                result_type = result["type"]
+                if isinstance(result_type, list):
+                    result["type"] = result_type if "null" in result_type else [*result_type, "null"]
+                else:
+                    result["type"] = [result_type, "null"]
             for key, value in node.items():
                 if key != union_key and key not in result:
                     result[key] = value
             return result
 
         return node
+
+    def is_nullable_container(node: dict[str, Any]) -> bool:
+        node = resolve_ref_node(node)
+        node_type = node.get("type")
+        if isinstance(node_type, list):
+            return "null" in node_type and ("array" in node_type or "object" in node_type)
+        for key in ("anyOf", "oneOf"):
+            options = node.get(key)
+            if isinstance(options, list) and any(is_null_schema(option) for option in options):
+                return normalize_nullable_schema(node).get("type") in ("array", "object")
+        return False
+
+    def non_null_type(node: dict[str, Any]) -> Any:
+        """Inspect the container/item type without changing the emitted schema."""
+        node_type = node.get("type")
+        if isinstance(node_type, list):
+            types = [value for value in node_type if value != "null"]
+            return types[0] if len(types) == 1 else node_type
+        return node_type
 
     def resolve_ref_node(node: dict[str, Any]) -> dict[str, Any]:
         ref = node.get("$ref")
@@ -188,7 +225,7 @@ def _adapt_schema_for_extend(
         node = normalize_nullable_schema(node)
         node = resolve_ref_node(node)
         result: dict[str, Any] = {}
-        node_type = node.get("type")
+        node_type = non_null_type(node)
 
         for key, value in node.items():
             # Skip unsupported properties
@@ -208,11 +245,14 @@ def _adapt_schema_for_extend(
                         renamed_props.setdefault(path, {})[out_name] = prop_name
                     adapted_props[out_name] = adapt_node(prop_schema, child_path)
                 result["properties"] = adapted_props
+            elif key == "required" and isinstance(value, list):
+                properties = node.get("properties") or {}
+                result[key] = [name for name in value if not is_nullable_container(properties.get(name) or {})]
             elif key == "items" and node_type == "array":
                 # Handle array items
                 if isinstance(value, dict):
-                    resolved_items = resolve_ref_node(value)
-                    items_type = resolved_items.get("type")
+                    resolved_items = normalize_nullable_schema(resolve_ref_node(value))
+                    items_type = non_null_type(resolved_items)
                     is_empty_object = items_type == "object" and not resolved_items.get("properties")
                     # A primitive array, or an empty-object array (a field whose
                     # values are never populated -- GT is always []). Extend
@@ -222,7 +262,7 @@ def _adapt_schema_for_extend(
                         primitive_array_paths[path] = [wrapped_type]
                         result["items"] = {
                             "type": "object",
-                            "properties": {"value": {"type": wrapped_type}},
+                            "properties": {"value": {"type": "string" if is_empty_object else resolved_items["type"]}},
                         }
                     else:
                         # Recurse into object items
@@ -357,6 +397,8 @@ class ExtendProvider(Provider):
     - Unsupported properties (pattern, not, allOf, etc.) are stripped
     """
 
+    _attach_cost_stats = staticmethod(_attach_cost_stats)
+
     def __init__(
         self,
         provider_name: str,
@@ -414,6 +456,8 @@ class ExtendProvider(Provider):
         base_url = self.base_config.get("base_url")
         if base_url:
             client_kwargs["base_url"] = base_url
+        if "api_version" in self.base_config:
+            client_kwargs["extend_api_version"] = self.base_config["api_version"]
 
         self._client = Extend(**client_kwargs)
 
@@ -878,7 +922,7 @@ class ExtendProvider(Provider):
             completed_at = datetime.now()
             latency_ms = int((completed_at - started_at).total_seconds() * 1000)
 
-            _attach_cost_stats(raw_output, pipeline.config)
+            self._attach_cost_stats(raw_output, pipeline.config)
 
             return RawInferenceResult(
                 request=request,
@@ -914,7 +958,7 @@ class ExtendProvider(Provider):
 
         # Backfill cost stats for raw results recorded before cost tracking
         # existed (renormalize path); no-op when run_inference already set them.
-        _attach_cost_stats(raw_result.raw_output, raw_result.pipeline.config)
+        self._attach_cost_stats(raw_result.raw_output, raw_result.pipeline.config)
 
         # Extract the structured data from processor_run.output.value; every
         # level can be null (not just absent) on failed or partial runs.
