@@ -20,6 +20,7 @@ def test_a_coding_agent_document_gets_one_run_and_is_never_restarted(
     """Claude Code and Codex documents were restarted from zero after an error (including the provider's own
     20-minute stop), and their stored latency and cost covered only the last run. An error now fails the
     document after its one run."""
+    pytest.importorskip("pypdf", reason="dev and runners extras required; run: uv sync --extra dev --extra runners")
     monkeypatch.setattr(runner_module, "INITIAL_BACKOFF_S", 0.0)
     pipeline = PipelineSpec(
         pipeline_name=f"{provider_name}_one_run", provider_name=provider_name, product_type=ProductType.EXTRACT

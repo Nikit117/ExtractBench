@@ -3,8 +3,11 @@
 import json
 from pathlib import Path
 
-import httpx
 import pytest
+
+pytest.importorskip("extend_ai", reason="dev and runners extras required; run: uv sync --extra dev --extra runners")
+
+import httpx
 from extend_ai import Extend
 
 from extract_bench.evaluation.stats import build_operational_stats
