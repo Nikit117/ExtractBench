@@ -536,6 +536,8 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         )
     )
 
+    # Bypass Datalab's server cache: a cached result returns at once and bills
+    # $0, so a rerun would report neither the real cost nor the real latency.
     for _extraction_mode in ("fast", "balanced", "accurate"):
         register_fn(
             _pipeline_spec(
@@ -545,6 +547,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                     "parse_mode": "accurate",
                     "extraction_mode": _extraction_mode,
                     "output_format": "json",
+                    "skip_cache": True,
                 },
             )
         )

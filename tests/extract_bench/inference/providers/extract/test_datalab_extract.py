@@ -79,6 +79,7 @@ def test_explicit_datalab_extract_pipeline_pricing(
     pipeline = get_pipeline(pipeline_name)
     assert pipeline.config["parse_mode"] == parse_mode
     assert pipeline.config["extraction_mode"] == extraction_mode
+    assert pipeline.config["skip_cache"] is True
     DatalabExtractProvider("datalab_extract", {**pipeline.config, "api_key": "test-key"})
 
     raw_output: dict[str, object] = {}
