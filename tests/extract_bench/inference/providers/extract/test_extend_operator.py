@@ -1,6 +1,8 @@
 """Operator API serialization, billing, and retry boundaries."""
 
+import concurrent.futures
 import json
+import threading
 from pathlib import Path
 
 import pytest
@@ -106,14 +108,13 @@ def test_sdk_poll_preserves_full_operator_cost_without_double_counting_parse(mon
         )
 
     monkeypatch.setenv("EXTEND_API_KEY", "test")
-    provider = ExtendOperatorProvider("extend_operator", pipeline.config)
+    provider = ExtendOperatorProvider("extend_operator", {**pipeline.config, "async_poll_interval": 0.0})
     provider._client = Extend(
         token="test",
         extend_api_version=pipeline.config["api_version"],
         httpx_client=httpx.Client(transport=httpx.MockTransport(handle)),
     )
     monkeypatch.setattr(provider, "_upload_file", lambda _: "file_test")
-    monkeypatch.setattr("extract_bench.inference.providers.extract.extend_operator.time.sleep", lambda _: None)
     result = provider.normalize(
         provider.run_inference(
             pipeline,
@@ -147,11 +148,10 @@ def test_missing_rollup_does_not_add_parse_estimate_or_invent_agent_cost():
     assert "parse_credits" not in raw
 
 
-def test_poll_exhaustion_is_permanent_to_prevent_duplicate_billed_run(monkeypatch):
+def test_poll_exhaustion_is_permanent_to_prevent_duplicate_billed_run(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("EXTEND_API_KEY", "test")
-    provider = ExtendOperatorProvider("extend_operator", {"async_max_poll_errors": 0})
+    provider = ExtendOperatorProvider("extend_operator", {"async_max_poll_errors": 0, "async_poll_interval": 0.0})
     monkeypatch.setattr(provider, "_upload_file", lambda _: "file_test")
-    monkeypatch.setattr("extract_bench.inference.providers.extract.extend_operator.time.sleep", lambda _: None)
     from unittest.mock import Mock
 
     provider._client = Mock()
@@ -160,6 +160,69 @@ def test_poll_exhaustion_is_permanent_to_prevent_duplicate_billed_run(monkeypatc
         "status": "PROCESSING",
     }
     provider._client.extract_runs.retrieve.side_effect = httpx.ReadTimeout("poll failed")
+    source = tmp_path / "invoice.pdf"
+    source.write_bytes(b"document")
     with pytest.raises(ProviderPermanentError, match="exr_existing"):
-        provider._extract_document("unused.pdf", {"type": "object"}, {})
+        provider.run_inference(
+            get_pipeline("extend_extract_operator"),
+            InferenceRequest(
+                example_id="invoice",
+                source_file_path=str(source),
+                product_type=ProductType.EXTRACT,
+                schema_override={"type": "object"},
+            ),
+        )
     assert provider._client.extract_runs.create.call_count == 1
+
+
+def test_cancel_stops_only_the_requested_operator_worker(monkeypatch, tmp_path: Path):
+    """A timed-out Operator request must release its worker without cancelling another document."""
+    from unittest.mock import Mock
+
+    provider = ExtendOperatorProvider("extend_operator", {"api_key": "test", "async_poll_interval": 0.01})
+    started = {name: threading.Event() for name in ("first", "second")}
+    finish = threading.Event()
+
+    def response(run_id, status):
+        result = Mock()
+        result.model_dump.return_value = {"id": run_id, "status": status, "output": {"value": {}}}
+        return result
+
+    def create(*, file, **kwargs):
+        started[file["id"]].set()
+        return response(f"exr_{file['id']}", "PROCESSING")
+
+    provider._client = Mock()
+    provider._client.extract_runs.create.side_effect = create
+    provider._client.extract_runs.retrieve.side_effect = lambda run_id, **kwargs: response(
+        run_id, "PROCESSED" if finish.is_set() else "PROCESSING"
+    )
+    monkeypatch.setattr(provider, "_upload_file", lambda path: Path(path).stem)
+    pipeline = get_pipeline("extend_extract_operator")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        futures = {}
+        try:
+            for name in started:
+                source = tmp_path / f"{name}.pdf"
+                source.write_bytes(b"document")
+                request = InferenceRequest(
+                    example_id=name,
+                    source_file_path=str(source),
+                    product_type=ProductType.EXTRACT,
+                    schema_override={"type": "object"},
+                )
+                futures[name] = executor.submit(provider.run_inference, pipeline, request)
+            for event in started.values():
+                assert event.wait(timeout=5)
+            assert provider.cancel("first")
+            with pytest.raises(ProviderPermanentError, match="exr_first") as error:
+                futures["first"].result(timeout=5)
+            assert error.value.job_id == "exr_first"
+            assert error.value.debug_payload == {"operator_run_id": "exr_first"}
+            assert not futures["second"].done()
+            assert not provider.cancel("first")
+        finally:
+            finish.set()
+            for name in started:
+                provider.cancel(name)
+    assert not provider.cancel("second")

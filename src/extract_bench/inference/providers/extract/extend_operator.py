@@ -4,7 +4,8 @@ https://docs.extend.ai/extraction/operator
 https://docs.extend.ai/general/operator-pricing
 """
 
-import time
+import threading
+from contextvars import ContextVar
 from typing import Any
 
 from extend_ai.core.api_error import ApiError
@@ -17,6 +18,8 @@ from extract_bench.inference.providers.extract.extend import (
     _coerce_nonnegative_float,
 )
 from extract_bench.inference.providers.registry import register_provider
+from extract_bench.schemas.pipeline import PipelineSpec
+from extract_bench.schemas.pipeline_io import InferenceRequest, RawInferenceResult
 
 
 def _attach_operator_cost_stats(raw_output: dict[str, Any], pipeline_config: dict[str, Any]) -> None:
@@ -72,9 +75,50 @@ class ExtendOperatorProvider(ExtendProvider):
 
     _attach_cost_stats = staticmethod(_attach_operator_cost_stats)
 
+    def __init__(self, provider_name: str, base_config: dict[str, Any] | None = None):
+        super().__init__(provider_name, base_config)
+        self._active_runs: dict[str, threading.Event] = {}
+        self._active_runs_lock = threading.Lock()
+        # The shared Extend call path does not pass example IDs to _extract_document.
+        # Context-local state binds its polling loop to the current worker's request.
+        self._cancel_event: ContextVar[threading.Event] = ContextVar("extend_operator_cancel_event")
+
+    def run_inference(self, pipeline: PipelineSpec, request: InferenceRequest) -> RawInferenceResult:
+        cancelled = threading.Event()
+        with self._active_runs_lock:
+            self._active_runs[request.example_id] = cancelled
+        token = self._cancel_event.set(cancelled)
+        try:
+            return super().run_inference(pipeline, request)
+        finally:
+            self._cancel_event.reset(token)
+            with self._active_runs_lock:
+                if self._active_runs.get(request.example_id) is cancelled:
+                    self._active_runs.pop(request.example_id)
+
+    def cancel(self, example_id: str) -> bool:
+        with self._active_runs_lock:
+            cancelled = self._active_runs.get(example_id)
+            if cancelled is None:
+                return False
+            cancelled.set()
+        return True
+
     def _extract_document(
         self, file_path: str, schema: dict[str, Any], pipeline_config: dict[str, Any]
     ) -> dict[str, Any]:
+        cancelled = self._cancel_event.get()
+        run_id: str | None = None
+
+        def check_cancelled() -> None:
+            if cancelled.is_set():
+                raise ProviderPermanentError(
+                    f"Operator run {run_id} cancelled" if run_id is not None else "Operator extraction cancelled",
+                    job_id=run_id,
+                    debug_payload={"operator_run_id": run_id} if run_id is not None else None,
+                )
+
+        check_cancelled()
         adapted_schema, primitive_array_paths, renamed_props = _adapt_schema_for_extend(schema)
 
         def make_nullable(node: dict[str, Any]) -> None:
@@ -92,6 +136,7 @@ class ExtendOperatorProvider(ExtendProvider):
 
         make_nullable(adapted_schema)
         file_id = self._upload_file(file_path)
+        check_cancelled()
         config = {
             "baseProcessor": "extraction_operator",
             "schema": adapted_schema,
@@ -118,7 +163,8 @@ class ExtendOperatorProvider(ExtendProvider):
         run_id = run["id"]
         consecutive_poll_errors = 0
         while run.get("status") in ("PENDING", "PROCESSING"):
-            time.sleep(self._async_poll_interval)
+            if cancelled.wait(self._async_poll_interval):
+                check_cancelled()
             try:
                 response = self._client.extract_runs.retrieve(run_id, request_options={"max_retries": 0})
                 run = response.model_dump(mode="json", by_alias=True)
@@ -132,6 +178,7 @@ class ExtendOperatorProvider(ExtendProvider):
                     # polling failure. Include the existing ID for recovery.
                     raise ProviderPermanentError(f"Cannot poll Operator run {run_id}: {error}") from error
 
+        check_cancelled()
         if run.get("status") != "PROCESSED":
             raise ProviderPermanentError(
                 f"Operator run {run_id} ended with {run.get('status')}: "
