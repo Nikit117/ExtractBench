@@ -83,6 +83,11 @@ class ProviderTerminalCheckpointError(ProviderPermanentError):
 class Provider(ABC):
     """Abstract base class for document parsing providers."""
 
+    #: Whether the runner retries a document after a transient or rate-limit error. A provider that
+    #: sets this False gets one run per document: an error fails it, and only the run's per-file
+    #: timeout limits how long it takes.
+    retries_transient_errors: bool = True
+
     def __init__(
         self,
         provider_name: str,

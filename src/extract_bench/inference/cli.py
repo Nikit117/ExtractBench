@@ -15,7 +15,7 @@ from rich.table import Table
 from extract_bench.inference.pipelines import get_pipeline, list_pipelines
 from extract_bench.inference.providers.registry import create_provider
 from extract_bench.inference.renormalize import renormalize_results
-from extract_bench.inference.runner import InferenceRunner
+from extract_bench.inference.runner import DEFAULT_TIMEOUT_RETRIES, InferenceRunner
 from extract_bench.schemas.product import ProductType
 from extract_bench.test_cases import load_test_cases
 from extract_bench.test_cases.schema import (
@@ -156,7 +156,7 @@ class InferenceCLI:
         group: str | None = None,
         tags: str | tuple[str, ...] | list[str] | None = None,
         per_file_timeout: float | None = None,
-        timeout_retries: int = 2,
+        timeout_retries: int = DEFAULT_TIMEOUT_RETRIES,
         force_exit_on_completion: bool = True,
         shuffle_seed: int | None = None,
         max_concurrent_pages: int | None = None,
@@ -185,7 +185,7 @@ class InferenceCLI:
             per_file_timeout: Explicit run-level max seconds per file. Overrides any
                 per-pipeline value. None (default) → use the pipeline's per_file_timeout,
                 falling back to 600s.
-            timeout_retries: Number of retries on per-file timeout (default: 2)
+            timeout_retries: Number of retries on per-file timeout (default: 0)
             shuffle_seed: Reproducible shuffle of sorted test IDs; None preserves input order.
             force_exit_on_completion: Force process exit after inference completes to
                 avoid waiting on zombie provider threads (default: True)
@@ -230,7 +230,7 @@ class InferenceCLI:
         group: str | None,
         tags: str | tuple[str, ...] | list[str] | None,
         per_file_timeout: float | None = None,
-        timeout_retries: int = 2,
+        timeout_retries: int = DEFAULT_TIMEOUT_RETRIES,
         force_exit_on_completion: bool = True,
         shuffle_seed: int | None = None,
         max_concurrent_pages: int | None = None,

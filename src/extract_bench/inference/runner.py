@@ -53,7 +53,7 @@ BACKOFF_MULTIPLIER = 2.0  # exponential backoff factor
 
 # Per-file timeout and retry configuration
 DEFAULT_PER_FILE_TIMEOUT_S = 1800.0  # 30 minutes per file
-DEFAULT_TIMEOUT_RETRIES = 2  # retry up to 2 times on timeout
+DEFAULT_TIMEOUT_RETRIES = 0  # do not retry timed-out files by default
 
 LOCAL_ARTIFACT_PROVIDER_NAMES: set[str] = set()
 
@@ -194,7 +194,7 @@ class InferenceRunner:
         :param tags: Optional list of tags for this run (e.g., ['nightly', 'production'])
         :param per_file_timeout: Explicit run-level max seconds per file. None (default)
             falls back to the pipeline's per_file_timeout, then DEFAULT_PER_FILE_TIMEOUT_S.
-        :param timeout_retries: Number of retries on per-file timeout (default: 2)
+        :param timeout_retries: Number of retries on per-file timeout (default: 0)
         """
         self.provider = provider
         self.pipeline = pipeline
@@ -657,15 +657,17 @@ class InferenceRunner:
                 product_type=product_type,
             )
 
-            # Run inference with retry for transient / rate-limit errors
+            # Run inference with retry for transient / rate-limit errors. A provider
+            # with ``retries_transient_errors`` False gets a single run.
             last_error: Exception | None = None
-            for attempt in range(MAX_RETRIES + 1):
+            retries = MAX_RETRIES if getattr(self.provider, "retries_transient_errors", True) else 0
+            for attempt in range(retries + 1):
                 try:
                     raw_result = self._run_provider_inference(request)
                     break
                 except (ProviderTransientError, ProviderRateLimitError) as e:
                     last_error = e
-                    if attempt < MAX_RETRIES:
+                    if attempt < retries:
                         backoff = INITIAL_BACKOFF_S * (BACKOFF_MULTIPLIER**attempt)
                         time.sleep(backoff)
                     else:
@@ -751,15 +753,17 @@ class InferenceRunner:
                 config_override=getattr(test_case, "config", None),
             )
 
-            # Run inference with retry for transient / rate-limit errors
+            # Run inference with retry for transient / rate-limit errors. A provider
+            # with ``retries_transient_errors`` False gets a single run.
             last_error: Exception | None = None
-            for attempt in range(MAX_RETRIES + 1):
+            retries = MAX_RETRIES if getattr(self.provider, "retries_transient_errors", True) else 0
+            for attempt in range(retries + 1):
                 try:
                     raw_result = self._run_provider_inference(request)
                     break
                 except (ProviderTransientError, ProviderRateLimitError) as e:
                     last_error = e
-                    if attempt < MAX_RETRIES:
+                    if attempt < retries:
                         backoff = INITIAL_BACKOFF_S * (BACKOFF_MULTIPLIER**attempt)
                         time.sleep(backoff)
                     else:
