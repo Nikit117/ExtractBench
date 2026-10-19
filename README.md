@@ -38,7 +38,7 @@ Models and prices reflect each provider's official documentation; each system us
 | 9 | LlamaExtract Cost-Effective | LlamaExtract | 93.67 | 96.07 | 90.21 | 80.48 | 1.00¢ |
 | 10 | Codex (GPT-5.5) | Coding Agents | 93.57 | 95.68 | 91.15 | 78.88 | 27.83¢ |
 
-Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 50 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
@@ -63,7 +63,7 @@ Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
   </tbody>
 </table>
 
-Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
+Top 10 of 50 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- GROUNDING:END -->
 
 <details>

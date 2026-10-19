@@ -921,3 +921,19 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             },
         )
     )
+
+    # The PAEN TUI Harness is a local tool-using agent (gpt-5.4 on Azure OpenAI
+    # with Azure Document Intelligence for layout).  It runs as a subprocess, like
+    # the other coding-agent pipelines, so the official environment needs no extra
+    # Python packages: set PAEN_HARNESS_ROOT to the harness checkout and
+    # PAEN_HARNESS_PYTHON to an interpreter that has its dependencies.
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="paen_tui_harness_gpt_5_4",
+            provider_name="paen_tui_extract",
+            config={"timeout": 3600},
+            # The harness enumerates long record lists page by page, so a
+            # 192-page document needs more than the 600s run default.
+            per_file_timeout=3600.0,
+        )
+    )
