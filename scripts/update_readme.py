@@ -59,7 +59,7 @@ def table(header: str, aligns: str, rows: list[list[str]]) -> str:
     return "\n".join([header, aligns, *(f"| {' | '.join(r)} |" for r in rows)])
 
 
-# README shows only the top N; leaderboard.csv carries the full table.
+# README shows only the top N; the CSV files carry the full tables.
 TOP_N = 10
 
 
@@ -152,10 +152,10 @@ def pro_table(rows: list[dict[str, str]]) -> str:
             float(row["Cost_Per_Page"]) if row["Cost_Per_Page"] != "" else float("inf"),
             row["Provider"],
         ),
-    )
+    )[:TOP_N]
     columns = ("Perfect_Documents", "Value_F1", "Word_Grounding", "Page_Grounding")
     ranks = column_ranks(overall, columns)
-    return table(
+    body = table(
         "| Rank | Provider | Category | % Perfect | Value F1 | Box F1 | Page F1 | ¢ / Page |",
         "|---:|---|---|---:|---:|---:|---:|---:|",
         [
@@ -171,6 +171,10 @@ def pro_table(rows: list[dict[str, str]]) -> str:
             ]
             for index, row in enumerate(ranked, 1)
         ],
+    )
+    return (
+        f"{body}\n\nTop {len(ranked)} of {len(overall)} systems — "
+        "full table in [leaderboard-pro.csv](leaderboard-pro.csv)."
     )
 
 
@@ -218,10 +222,9 @@ def main() -> None:
     readme = replace_block(
         readme,
         "PRO_LEADERBOARD",
-        "Scores are percentages; costs are USD per page, displayed in cents. Rows are ordered by "
+        "Scores are percentages; costs are USD. Rows are ordered by "
         "% Perfect, then Value F1, then lower cost. The best score in each "
-        "metric is **bold**; the second-best distinct score is <u>underlined</u>. A dash means "
-        "unreported, not zero.\n\n" + pro_table(pro_rows),
+        "metric is **bold**; the second-best distinct score is <u>underlined</u>.\n\n" + pro_table(pro_rows),
     )
     if args.check:
         if readme != original:

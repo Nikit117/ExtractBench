@@ -84,7 +84,7 @@ Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
 100 documents across six challenges. **% Perfect** is the percentage of documents with 100% Value F1. Failed documents and documents exceeding the 30-minute limit score zero. Grounding is evaluated on the 81 documents with verified evidence boxes.
 
 <!-- PRO_LEADERBOARD:START -->
-Scores are percentages; costs are USD per page, displayed in cents. Rows are ordered by % Perfect, then Value F1, then lower cost. The best score in each metric is **bold**; the second-best distinct score is <u>underlined</u>. A dash means unreported, not zero.
+Scores are percentages; costs are USD. Rows are ordered by % Perfect, then Value F1, then lower cost. The best score in each metric is **bold**; the second-best distinct score is <u>underlined</u>.
 
 | Rank | Provider | Category | % Perfect | Value F1 | Box F1 | Page F1 | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|---:|
@@ -98,8 +98,8 @@ Scores are percentages; costs are USD per page, displayed in cents. Rows are ord
 | 8 | Codex GPT-6.1 Sol | Coding Agents | 12.00 | 74.06 | <u>63.96</u> | 72.26 | 13.86¢ |
 | 9 | Reducto Deep | Specialized APIs | 3.00 | 56.35 | 42.20 | 62.38 | 6.18¢ |
 | 10 | Datalab Accurate | Specialized APIs | 2.00 | 43.93 | 0.32 | 4.66 | 15.75¢ |
-| 11 | Codex GPT-6 Luna | Coding Agents | 0.00 | 48.75 | 44.27 | 60.78 | 1.14¢ |
-| 12 | LlamaExtract Cost Effective | LlamaExtract | 0.00 | 47.19 | 49.40 | 56.46 | 1.00¢ |
+
+Top 10 of 12 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv).
 <!-- PRO_LEADERBOARD:END -->
 
 The [Pro CSV](leaderboard-pro.csv) includes overall scores and all six challenge slices from the published launch results.
