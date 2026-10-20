@@ -1,27 +1,24 @@
-"""Regenerate the leaderboard tables in README.md from leaderboard.csv.
+"""Regenerate README leaderboard tables from leaderboard.csv and leaderboard-pro.csv.
 
-Two tables are generated:
+Three tables are generated:
 
     LEADERBOARD    unified value F1 (the headline metric)
     GROUNDING      word-level and page-level grounding F1, side by side
+    PRO_LEADERBOARD  perfect documents, value F1, grounding and cost on Pro
 
 Run: uv run python scripts/update_readme.py
 """
 
 from __future__ import annotations
 
+import argparse
 import csv
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CSV_PATH = REPO_ROOT / "leaderboard.csv"
+PRO_CSV_PATH = REPO_ROOT / "leaderboard-pro.csv"
 README_PATH = REPO_ROOT / "README.md"
-
-
-# Grounding is only defined where a field's ground truth carries a verified box,
-# so both grounding tables are scored over a smaller and differently distributed
-# document set than the value F1 above — their columns do not reconcile with it.
-GROUNDING_SCOPE_NOTE = "Scored only over the documents that carry verified box ground truth."
 
 
 def fmt(v: str) -> str:
@@ -37,7 +34,7 @@ def column_ranks(rows: list[dict], columns: tuple[str, ...]) -> dict[str, dict[f
     """Return emphasis for the best and second-best distinct score in each column."""
     ranks = {}
     for column in columns:
-        values = sorted({float(row[column]) for row in rows}, reverse=True)
+        values = sorted({float(row[column]) for row in rows if row[column] != ""}, reverse=True)
         ranks[column] = dict(zip(values[:2], ("best", "second"), strict=False))
     return ranks
 
@@ -56,7 +53,7 @@ def table(header: str, aligns: str, rows: list[list[str]]) -> str:
     return "\n".join([header, aligns, *(f"| {' | '.join(r)} |" for r in rows)])
 
 
-# README shows only the top N; leaderboard.csv carries the full table.
+# README shows only the top N; the CSV files carry the full tables.
 TOP_N = 10
 
 
@@ -138,6 +135,48 @@ def grounding_table(rows: list[dict]) -> str:
     )
 
 
+def pro_table(rows: list[dict[str, str]]) -> str:
+    """Rank the overall Pro slice, retaining challenge rows in the source CSV."""
+    overall = [row for row in rows if row["Challenge"] == "all"]
+    ranked = sorted(
+        overall,
+        key=lambda row: (
+            -float(row["Perfect_Documents"]),
+            -float(row["Value_F1"]),
+            float(row["Cost_Per_Page"]) if row["Cost_Per_Page"] != "" else float("inf"),
+            row["Provider"],
+        ),
+    )[:TOP_N]
+    columns = ("Perfect_Documents", "Value_F1", "Word_Grounding", "Page_Grounding")
+    ranks = column_ranks(overall, columns)
+    body = table(
+        "| Rank | Provider | Category | % Perfect | Value F1 | Box F1 | Page F1 | ¢ / Page |",
+        "|---:|---|---|---:|---:|---:|---:|---:|",
+        [
+            [
+                str(index),
+                row["Provider"],
+                row["Category"],
+                *(
+                    fmt_ranked(
+                        f"{float(row[column]):.0f}" if column == "Perfect_Documents" else row[column],
+                        ranks[column].get(float(row[column])),
+                    )
+                    if row[column] != ""
+                    else "—"
+                    for column in columns
+                ),
+                fmt_cost(row["Cost_Per_Page"]),
+            ]
+            for index, row in enumerate(ranked, 1)
+        ],
+    )
+    return (
+        f"{body}\n\nTop {len(ranked)} of {len(overall)} systems — "
+        "full table in [leaderboard-pro.csv](leaderboard-pro.csv)."
+    )
+
+
 def replace_block(readme: str, name: str, body: str) -> str:
     start_marker, end_marker = f"<!-- {name}:START -->", f"<!-- {name}:END -->"
     start, end = readme.find(start_marker), readme.find(end_marker)
@@ -148,32 +187,39 @@ def replace_block(readme: str, name: str, body: str) -> str:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check", action="store_true", help="Fail if README tables are stale; do not write files")
+    args = parser.parse_args()
     with CSV_PATH.open() as f:
         rows = [r for r in csv.DictReader(f) if r.get("Provider")]
 
-    readme = README_PATH.read_text()
+    with PRO_CSV_PATH.open() as f:
+        pro_rows = [row for row in csv.DictReader(f) if row.get("Provider")]
+
+    original = README_PATH.read_text()
+    readme = original
     readme = replace_block(
         readme,
         "LEADERBOARD",
-        "**Unified value F1** — the headline metric. Every score is an unweighted mean over "
-        "documents; each document counts once, whatever its length. For raw data including per-split "
-        "precision and recall, cost, and latency, see [leaderboard.csv](leaderboard.csv). "
-        "Equal displayed Overall scores are ordered by lower cost per page. "
-        "The best score in each Overall, Short, Medium, and Long column is **bold**; the second-best "
-        "distinct score is <u>underlined</u>.\n\n" + value_table(rows),
+        "**Unified value F1** — rows are ordered by Overall Value F1, then lower cost.\n\n" + value_table(rows),
     )
     readme = replace_block(
         readme,
         "GROUNDING",
-        "**Grounding F1** — a field counts only when its value is accepted *and* it points at the "
-        "right evidence: at word level the predicted box must overlap an accepted evidence box at "
-        "IoU 0.5, at page level the cited page must be correct. "
-        + GROUNDING_SCOPE_NOTE
-        + "\n\n"
-        + grounding_table(rows),
+        "**Grounding F1** — rows are ordered by overall word-level grounding F1.\n\n" + grounding_table(rows),
     )
-    README_PATH.write_text(readme)
-    print(f"Updated README.md from {CSV_PATH.name} ({len(rows)} systems)")
+    readme = replace_block(
+        readme,
+        "PRO_LEADERBOARD",
+        "Rows are ordered by % Perfect, then Value F1, then lower cost.\n\n" + pro_table(pro_rows),
+    )
+    if args.check:
+        if readme != original:
+            raise SystemExit("README leaderboard tables are stale. Run: uv run python scripts/update_readme.py")
+        print("README leaderboard tables are up to date")
+    else:
+        README_PATH.write_text(readme)
+        print(f"Updated README.md from {CSV_PATH.name} and {PRO_CSV_PATH.name}")
 
 
 if __name__ == "__main__":
