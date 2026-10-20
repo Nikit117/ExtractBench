@@ -304,13 +304,6 @@ def test_public_extract_pipelines_registered() -> None:
     assert "use_staging" not in llamaextract.config
 
     for tier in ("cost_effective", "agentic"):
-        default = get_pipeline(f"llamaextract_{tier}")
-        parse_config = default.config["parse_config"]
-        assert parse_config["output_options"]["granular_bboxes"] == ["word"]
-        assert parse_config["tier"] == tier
-        assert default.config["parse_tier"] == tier
-        assert "use_staging" not in default.config
-
         standard = get_pipeline(f"llamaextract_{tier}_standard_bbox")
         assert standard.config["tier"] == tier
         assert "parse_config" not in standard.config

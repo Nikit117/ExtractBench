@@ -10,20 +10,6 @@ from typing import Any
 from extract_bench.schemas.pipeline import PipelineSpec
 from extract_bench.schemas.product import ProductType
 
-GRANULAR_BBOX_OUTPUT_OPTIONS = {
-    "granular_bboxes": ["word"],
-}
-
-
-def _granular_parse_config(tier: str) -> dict[str, Any]:
-    """Parse config emitting word-level boxes at the given tier."""
-    return {
-        "tier": tier,
-        "version": "latest",
-        "disable_cache": True,
-        "output_options": GRANULAR_BBOX_OUTPUT_OPTIONS,
-    }
-
 
 def _pipeline_spec(
     *,
@@ -55,10 +41,9 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 provider_name="llamaextract_v2",
                 config={
                     "tier": _tier,
-                    "parse_tier": _tier,
+                    "extract_version": "2.6",
                     "timeout": 3000,
                     "cite_sources": True,
-                    "parse_config": _granular_parse_config(_tier),
                 },
                 # The provider polls the hosted job for up to `timeout` seconds; give
                 # the runner-level watchdog headroom past that so long documents are
