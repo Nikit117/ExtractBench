@@ -29,7 +29,7 @@ Scores are percentages; costs are USD. Pro rows are ordered by % Perfect, then V
 ### ExtractBench leaderboard
 
 <!-- LEADERBOARD:START -->
-**Unified value F1** — the headline metric. Every score is an unweighted mean over documents; each document counts once, whatever its length. For raw data including per-split precision and recall, cost, and latency, see [leaderboard.csv](leaderboard.csv). Equal displayed Overall scores are ordered by lower cost per page. The best score in each Overall, Short, Medium, and Long column is **bold**; the second-best distinct score is <u>underlined</u>.
+**Unified value F1** — the headline metric. Every score is an unweighted mean over documents; each document counts once, whatever its length. For raw data including per-split precision and recall, cost, and latency, see [leaderboard.csv](leaderboard.csv). Equal displayed Overall scores are ordered by lower cost per page.
 
 | Rank | Provider | Category | Overall | Short | Medium | Long | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|---:|
