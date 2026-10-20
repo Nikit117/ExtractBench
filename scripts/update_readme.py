@@ -21,12 +21,6 @@ PRO_CSV_PATH = REPO_ROOT / "leaderboard-pro.csv"
 README_PATH = REPO_ROOT / "README.md"
 
 
-# Grounding is only defined where a field's ground truth carries a verified box,
-# so both grounding tables are scored over a smaller and differently distributed
-# document set than the value F1 above — their columns do not reconcile with it.
-GROUNDING_SCOPE_NOTE = "Scored only over the documents that carry verified box ground truth."
-
-
 def fmt(v: str) -> str:
     return v if v else "—"
 
@@ -164,7 +158,12 @@ def pro_table(rows: list[dict[str, str]]) -> str:
                 row["Provider"],
                 row["Category"],
                 *(
-                    fmt_ranked(row[column], ranks[column].get(float(row[column]))) if row[column] != "" else "—"
+                    fmt_ranked(
+                        f"{float(row[column]):.0f}" if column == "Perfect_Documents" else row[column],
+                        ranks[column].get(float(row[column])),
+                    )
+                    if row[column] != ""
+                    else "—"
                     for column in columns
                 ),
                 fmt_cost(row["Cost_Per_Page"]),
@@ -214,10 +213,7 @@ def main() -> None:
         "GROUNDING",
         "**Grounding F1** — a field counts only when its value is accepted *and* it points at the "
         "right evidence: at word level the predicted box must overlap an accepted evidence box at "
-        "IoU 0.5, at page level the cited page must be correct. "
-        + GROUNDING_SCOPE_NOTE
-        + "\n\n"
-        + grounding_table(rows),
+        "IoU 0.5, at page level the cited page must be correct." + "\n\n" + grounding_table(rows),
     )
     readme = replace_block(
         readme,

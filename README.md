@@ -22,9 +22,9 @@ Read the [ExtractBench launch post](https://www.llamaindex.ai/blog/introducing-e
 
 [ExtractBench](#extractbench-leaderboard) · [ExtractBench Pro](#extractbench-pro-leaderboard) · [Submit results](#submitting-results)
 
-### ExtractBench leaderboard
+Models and prices reflect each provider's official documentation; each system uses its recommended configuration. Failed documents and Pro documents exceeding the 30-minute limit score zero. Grounding is evaluated on the subset of documents with verified evidence boxes.
 
-Models and prices reflect each provider's official documentation; each system uses its recommended configuration.
+### ExtractBench leaderboard
 
 <!-- LEADERBOARD:START -->
 **Unified value F1** — the headline metric. Every score is an unweighted mean over documents; each document counts once, whatever its length. For raw data including per-split precision and recall, cost, and latency, see [leaderboard.csv](leaderboard.csv). Equal displayed Overall scores are ordered by lower cost per page. The best score in each Overall, Short, Medium, and Long column is **bold**; the second-best distinct score is <u>underlined</u>.
@@ -46,7 +46,7 @@ Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
-**Grounding F1** — a field counts only when its value is accepted *and* it points at the right evidence: at word level the predicted box must overlap an accepted evidence box at IoU 0.5, at page level the cited page must be correct. Scored only over the documents that carry verified box ground truth.
+**Grounding F1** — a field counts only when its value is accepted *and* it points at the right evidence: at word level the predicted box must overlap an accepted evidence box at IoU 0.5, at page level the cited page must be correct.
 
 <table>
   <thead>
@@ -81,23 +81,23 @@ Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
 
 ### ExtractBench Pro leaderboard
 
-100 documents across six challenges. **% Perfect** is the percentage of documents with 100% Value F1. Failed documents and documents exceeding the 30-minute limit score zero. Grounding is evaluated on the 81 documents with verified evidence boxes.
+**% Perfect** is the percentage of documents with 100% Value F1.
 
 <!-- PRO_LEADERBOARD:START -->
 Scores are percentages; costs are USD. Rows are ordered by % Perfect, then Value F1, then lower cost. The best score in each metric is **bold**; the second-best distinct score is <u>underlined</u>.
 
 | Rank | Provider | Category | % Perfect | Value F1 | Box F1 | Page F1 | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|---:|
-| 1 | Codex GPT-6 Astra | Coding Agents | **58.00** | **94.53** | **70.97** | **79.10** | 95.20¢ |
-| 2 | Claude Code Opus 5.5 | Coding Agents | <u>51.00</u> | 74.87 | 45.29 | 56.85 | 41.20¢ |
-| 3 | LlamaExtract Agentic Plus | LlamaExtract | 38.00 | <u>77.70</u> | 60.39 | 66.01 | 7.50¢ |
-| 4 | Extend Operator | Specialized APIs | 34.00 | 73.87 | 57.75 | 68.84 | 9.88¢ |
-| 5 | Claude Code Sonnet 5.5 | Coding Agents | 32.00 | 73.62 | 40.47 | 53.00 | 19.98¢ |
-| 6 | LlamaExtract Agentic | LlamaExtract | 20.00 | 71.32 | 58.01 | 63.77 | 3.12¢ |
-| 7 | Pulse | Specialized APIs | 18.00 | 70.53 | 18.74 | <u>74.77</u> | 10.50¢ |
-| 8 | Codex GPT-6.1 Sol | Coding Agents | 12.00 | 74.06 | <u>63.96</u> | 72.26 | 13.86¢ |
-| 9 | Reducto Deep | Specialized APIs | 3.00 | 56.35 | 42.20 | 62.38 | 6.18¢ |
-| 10 | Datalab Accurate | Specialized APIs | 2.00 | 43.93 | 0.32 | 4.66 | 15.75¢ |
+| 1 | Codex GPT-6 Astra | Coding Agents | **58** | **94.53** | **70.97** | **79.10** | 95.20¢ |
+| 2 | Claude Code Opus 5.5 | Coding Agents | <u>51</u> | 74.87 | 45.29 | 56.85 | 41.20¢ |
+| 3 | LlamaExtract Agentic Plus | LlamaExtract | 38 | <u>77.70</u> | 60.39 | 66.01 | 7.50¢ |
+| 4 | Extend Operator | Specialized APIs | 34 | 73.87 | 57.75 | 68.84 | 9.88¢ |
+| 5 | Claude Code Sonnet 5.5 | Coding Agents | 32 | 73.62 | 40.47 | 53.00 | 19.98¢ |
+| 6 | LlamaExtract Agentic | LlamaExtract | 20 | 71.32 | 58.01 | 63.77 | 3.12¢ |
+| 7 | Pulse | Specialized APIs | 18 | 70.53 | 18.74 | <u>74.77</u> | 10.50¢ |
+| 8 | Codex GPT-6.1 Sol | Coding Agents | 12 | 74.06 | <u>63.96</u> | 72.26 | 13.86¢ |
+| 9 | Reducto Deep | Specialized APIs | 3 | 56.35 | 42.20 | 62.38 | 6.18¢ |
+| 10 | Datalab Accurate | Specialized APIs | 2 | 43.93 | 0.32 | 4.66 | 15.75¢ |
 
 Top 10 of 12 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv).
 <!-- PRO_LEADERBOARD:END -->
