@@ -201,22 +201,17 @@ def main() -> None:
     readme = replace_block(
         readme,
         "LEADERBOARD",
-        "**Unified value F1** — the headline metric. Every score is an unweighted mean over "
-        "documents; each document counts once, whatever its length. For raw data including per-split "
-        "precision and recall, cost, and latency, see [leaderboard.csv](leaderboard.csv). "
-        "Equal displayed Overall scores are ordered by lower cost per page.\n\n" + value_table(rows),
+        "**Unified value F1** — rows are ordered by Overall Value F1, then lower cost.\n\n" + value_table(rows),
     )
     readme = replace_block(
         readme,
         "GROUNDING",
-        "**Grounding F1** — a field counts only when its value is accepted *and* it points at the "
-        "right evidence: at word level the predicted box must overlap an accepted evidence box at "
-        "IoU 0.5, at page level the cited page must be correct." + "\n\n" + grounding_table(rows),
+        "**Grounding F1** — rows are ordered by overall word-level grounding F1.\n\n" + grounding_table(rows),
     )
     readme = replace_block(
         readme,
         "PRO_LEADERBOARD",
-        pro_table(pro_rows),
+        "Rows are ordered by % Perfect, then Value F1, then lower cost.\n\n" + pro_table(pro_rows),
     )
     if args.check:
         if readme != original:

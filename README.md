@@ -24,12 +24,23 @@ Read the [ExtractBench launch post](https://www.llamaindex.ai/blog/introducing-e
 
 Models and prices reflect each provider's official documentation; each system uses its recommended configuration.
 
-Scores are percentages; costs are USD. Pro rows are ordered by % Perfect, then Value F1, then lower cost. The best score in each metric is **bold**; the second-best distinct score is <u>underlined</u>.
+Scores are percentages; costs are USD. The best score in each metric is **bold**; the second-best distinct score is <u>underlined</u>.
+
+<details>
+<summary><strong>Metric details</strong></summary>
+
+- **Value F1:** F1 of extracted values, averaged across documents. Each document has equal weight, regardless of its length.
+- **Grounding F1:** requires both a correct value and correct evidence. **Box F1** requires the predicted box to overlap an accepted evidence box at IoU 0.5 or higher; **Page F1** requires the correct source page. Grounding is evaluated on the subset with verified ground-truth evidence for the corresponding metric.
+- **% Perfect:** percentage of documents with 100% Value F1.
+
+Failed documents and Pro documents exceeding the 30-minute limit score zero.
+
+</details>
 
 ### ExtractBench leaderboard
 
 <!-- LEADERBOARD:START -->
-**Unified value F1** — the headline metric. Every score is an unweighted mean over documents; each document counts once, whatever its length. For raw data including per-split precision and recall, cost, and latency, see [leaderboard.csv](leaderboard.csv). Equal displayed Overall scores are ordered by lower cost per page.
+**Unified value F1** — rows are ordered by Overall Value F1, then lower cost.
 
 | Rank | Provider | Category | Overall | Short | Medium | Long | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|---:|
@@ -48,7 +59,7 @@ Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- LEADERBOARD:END -->
 
 <!-- GROUNDING:START -->
-**Grounding F1** — a field counts only when its value is accepted *and* it points at the right evidence: at word level the predicted box must overlap an accepted evidence box at IoU 0.5, at page level the cited page must be correct.
+**Grounding F1** — rows are ordered by overall word-level grounding F1.
 
 <table>
   <thead>
@@ -72,20 +83,11 @@ Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
 Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
 <!-- GROUNDING:END -->
 
-<details>
-<summary><strong>Inclusion criteria</strong></summary>
-
-1. The model or API needs to be publicly accessible, either via open weights or a self-serve API that any user can sign up for.
-2. The benchmark run needs to finish within a reasonable time (roughly single-digit hours).
-3. We can adjust concurrency based on the provider's recommended settings, but providers should not require custom framework changes, so the evaluation stays fair across models.
-
-</details>
-
 ### ExtractBench Pro leaderboard
 
-**% Perfect** is the percentage of documents with 100% Value F1.
-
 <!-- PRO_LEADERBOARD:START -->
+Rows are ordered by % Perfect, then Value F1, then lower cost.
+
 | Rank | Provider | Category | % Perfect | Value F1 | Box F1 | Page F1 | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|---:|
 | 1 | Codex GPT-6 Astra | Coding Agents | **58** | **94.53** | **70.97** | **79.10** | 95.20¢ |
@@ -106,7 +108,14 @@ Top 10 of 12 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv
 
 Open a PR updating [leaderboard.csv](leaderboard.csv) or [leaderboard-pro.csv](leaderboard-pro.csv), with your pipeline configuration and evaluation reports. For Pro, include the overall (`all`) row and all six challenge rows. Scores are percentages; costs are USD per page. Regenerate the tables with `uv run python scripts/update_readme.py`.
 
-Failed documents and Pro documents exceeding the 30-minute limit score zero. Grounding is evaluated on the subset of documents with verified evidence boxes.
+<details>
+<summary><strong>Inclusion criteria</strong></summary>
+
+1. The model or API needs to be publicly accessible, either via open weights or a self-serve API that any user can sign up for.
+2. The benchmark run needs to finish within a reasonable time (roughly single-digit hours).
+3. We can adjust concurrency based on the provider's recommended settings, but providers should not require custom framework changes, so the evaluation stays fair across models.
+
+</details>
 
 ## Quick Start
 
