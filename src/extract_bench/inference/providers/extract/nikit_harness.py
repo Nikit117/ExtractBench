@@ -1,17 +1,15 @@
 """Provider for the Nikit Harness (gpt-5.4) on ExtractBench.
 
-The harness is a local, tool-using extraction agent: it stages the document,
-lets the model call tools (``read_page``, ``extract_table``, Document
-Intelligence layout analysis, vision) and returns schema-shaped JSON.  This
-provider runs one harness extraction per request and hands the extracted JSON
-to the official evaluator.
+The harness is the local TUI agent: it stages the document, lets the model call
+tools (``read_page``, ``extract_table``, Document-Intelligence layout analysis,
+vision) and returns schema-shaped JSON. This provider runs one harness
+extraction per request and hands the extracted JSON to the official evaluator.
 
 It deliberately calls the *same* helpers as the benchmark runner
 (``autonomous_document_harness/scripts/run_tui_benchmark_v2.py``), so the
 submitted system is the system that was measured: the non-record pruning rules,
-the redaction-marker rule, the bulk enumeration of long record lists, the
-staging-time OCR fallback for image-only pages and the structured-table rows
-all apply.
+the redaction-marker rule, the bulk enumeration of long record lists and the
+staging-time OCR fallback for image-only pages all apply.
 
 The harness returns no per-field citation boxes, so ``field_citations`` is empty
 and the grounding metrics are N/A for this system -- the same situation as the
@@ -20,14 +18,25 @@ other value-only entries on the leaderboard.
 Like the leaderboard's coding-agent pipelines (``claude_code_extract_*``,
 ``codex_code_extract_*``) this provider runs the extraction as a **local
 subprocess** -- ``scripts/extract_one.py`` -- so the official environment needs
-no extra Python packages.  The interpreter is taken from
-``PAEN_HARNESS_PYTHON`` (default: the repository's own ``.venv``), and the
-repository root from ``PAEN_HARNESS_ROOT``.
+no extra Python packages. The interpreter is taken from
+``NIKIT_HARNESS_PYTHON`` (default: the repository's own ``.venv``), and the
+repository root from ``NIKIT_HARNESS_ROOT``.
 
-Configuration options:
-    - ``timeout`` (int, default 3600): per-document timeout in seconds.  A
-      long document (192 pages) needs the bulk page-wise enumeration, which is
-      the slowest path in the harness.
+To register it with the official CLI, add to
+``extract_bench/inference/providers/extract/__init__.py``::
+
+    from .nikit_harness import NikitHarnessExtractProvider  # noqa: F401
+
+and to ``extract_bench/inference/pipelines/extract.py``::
+
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="nikit_harness_gpt_5_4",
+            provider_name="nikit_harness_extract",
+            config={"timeout": 3600},
+            per_file_timeout=3600.0,
+        )
+    )
 """
 
 from __future__ import annotations
@@ -44,9 +53,9 @@ from typing import Any
 
 from extract_bench.inference.providers.base import (
     Provider,
+    ProviderConfigError,
     ProviderPermanentError,
 )
-from extract_bench.inference.providers.registry import register_provider
 from extract_bench.schemas.extract_output import ExtractOutput
 from extract_bench.schemas.pipeline_io import (
     InferenceRequest,
@@ -55,9 +64,7 @@ from extract_bench.schemas.pipeline_io import (
 )
 from extract_bench.schemas.product import ProductType
 
-DEFAULT_REPO_ROOT = Path(
-    os.getenv("PAEN_HARNESS_ROOT") or r"C:\Users\INNIKAS2\Desktop\PAEN_Generative_AI_Proposal_Assistant"
-)
+DEFAULT_REPO_ROOT = Path(os.getenv("NIKIT_HARNESS_ROOT") or r"C:\path\to\nikit-harness")
 
 # The harness rules that were enabled for the measured 370-document benchmark
 # run (official ExtractBench scorer).  They are passed to the subprocess
@@ -77,7 +84,7 @@ HARNESS_ENV: dict[str, str] = {
 
 def _harness_python() -> str:
     """The interpreter that has the harness' dependencies."""
-    explicit = os.getenv("PAEN_HARNESS_PYTHON", "").strip()
+    explicit = os.getenv("NIKIT_HARNESS_PYTHON", "").strip()
     if explicit:
         return explicit
     candidate = DEFAULT_REPO_ROOT / ".venv" / "Scripts" / "python.exe"
@@ -90,10 +97,10 @@ async def _extract_async(source: Path, schema: dict[str, Any], timeout: float) -
     """Run the harness extraction as a subprocess and return the JSON."""
 
     def _run() -> dict[str, Any]:
-        repo = Path(os.getenv("PAEN_HARNESS_ROOT") or DEFAULT_REPO_ROOT)
+        repo = Path(os.getenv("NIKIT_HARNESS_ROOT") or DEFAULT_REPO_ROOT)
         script = repo / "autonomous_document_harness" / "scripts" / "extract_one.py"
         if not script.exists():
-            raise ProviderPermanentError(f"harness entry point not found: {script} (set PAEN_HARNESS_ROOT)")
+            raise ProviderPermanentError(f"harness entry point not found: {script} (set NIKIT_HARNESS_ROOT)")
         with tempfile.TemporaryDirectory() as td:
             schema_file = Path(td) / "schema.json"
             schema_file.write_text(json.dumps(schema), encoding="utf-8")
@@ -131,9 +138,14 @@ async def _extract_async(source: Path, schema: dict[str, Any], timeout: float) -
     return await asyncio.get_running_loop().run_in_executor(None, _run)
 
 
-@register_provider("paen_tui_extract")
-class PaenTuiExtractProvider(Provider):
-    """Provider for the PAEN TUI Harness on ExtractBench."""
+class NikitHarnessExtractProvider(Provider):
+    """Provider for the Nikit Harness on ExtractBench.
+
+    Configuration options:
+        - ``timeout`` (int, default 3600): per-document timeout in seconds. A
+          long document (192 pages) needs the bulk page-wise enumeration, which
+          is the slowest path in the harness.
+    """
 
     def __init__(self, provider_name: str, base_config: dict[str, Any] | None = None):
         super().__init__(provider_name, base_config)
@@ -142,7 +154,7 @@ class PaenTuiExtractProvider(Provider):
     def run_inference(self, pipeline: Any, request: InferenceRequest) -> RawInferenceResult:
         if request.product_type != ProductType.EXTRACT:
             raise ProviderPermanentError(
-                f"PaenTuiExtractProvider only supports EXTRACT product type, got {request.product_type}"
+                f"NikitHarnessExtractProvider only supports EXTRACT product type, got {request.product_type}"
             )
         if not request.schema_override:
             raise ProviderPermanentError("schema_override is required for EXTRACT product type.")
@@ -158,7 +170,7 @@ class PaenTuiExtractProvider(Provider):
                     timeout=self._timeout,
                 )
             )
-        except TimeoutError as exc:
+        except asyncio.TimeoutError as exc:
             raise ProviderPermanentError(f"harness extraction timed out after {self._timeout}s") from exc
         except ProviderPermanentError:
             raise
