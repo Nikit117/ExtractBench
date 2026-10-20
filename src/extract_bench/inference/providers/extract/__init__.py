@@ -32,7 +32,7 @@ _PROVIDER_MODULES = [
     "llamaextract_v2_api",
     "nuextract3_extract",
     "openai_responses",
-    "nikit_harness",
+    "kynex",
     "pulse",
     "reducto",
     "table_codegen_extract",
