@@ -81,12 +81,12 @@ Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
 
 ### ExtractBench Pro leaderboard
 
-100 documents across six challenges. **Perfect documents** is the percentage with 100% Value F1. Failed documents and documents exceeding the 30-minute limit score zero. Grounding is evaluated on the 81 documents with verified evidence boxes.
+100 documents across six challenges. **% Perfect** is the percentage of documents with 100% Value F1. Failed documents and documents exceeding the 30-minute limit score zero. Grounding is evaluated on the 81 documents with verified evidence boxes.
 
 <!-- PRO_LEADERBOARD:START -->
-Scores are percentages; costs are USD per page, displayed in cents. Rows are ordered by perfect-document percentage, then Value F1, then lower cost. The best score in each metric is **bold**; the second-best distinct score is <u>underlined</u>. A dash means unreported, not zero.
+Scores are percentages; costs are USD per page, displayed in cents. Rows are ordered by % Perfect, then Value F1, then lower cost. The best score in each metric is **bold**; the second-best distinct score is <u>underlined</u>. A dash means unreported, not zero.
 
-| Rank | Provider | Category | Perfect docs (%) | Value F1 | Box F1 | Page F1 | ¢ / Page |
+| Rank | Provider | Category | % Perfect | Value F1 | Box F1 | Page F1 | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|---:|
 | 1 | Codex GPT-6 Astra | Coding Agents | **58.00** | **94.53** | **70.97** | **79.10** | 95.20¢ |
 | 2 | Claude Code Opus 5.5 | Coding Agents | <u>51.00</u> | 74.87 | 45.29 | 56.85 | 41.20¢ |

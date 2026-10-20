@@ -156,7 +156,7 @@ def pro_table(rows: list[dict[str, str]]) -> str:
     columns = ("Perfect_Documents", "Value_F1", "Word_Grounding", "Page_Grounding")
     ranks = column_ranks(overall, columns)
     return table(
-        "| Rank | Provider | Category | Perfect docs (%) | Value F1 | Box F1 | Page F1 | ¢ / Page |",
+        "| Rank | Provider | Category | % Perfect | Value F1 | Box F1 | Page F1 | ¢ / Page |",
         "|---:|---|---|---:|---:|---:|---:|---:|",
         [
             [
@@ -219,7 +219,7 @@ def main() -> None:
         readme,
         "PRO_LEADERBOARD",
         "Scores are percentages; costs are USD per page, displayed in cents. Rows are ordered by "
-        "perfect-document percentage, then Value F1, then lower cost. The best score in each "
+        "% Perfect, then Value F1, then lower cost. The best score in each "
         "metric is **bold**; the second-best distinct score is <u>underlined</u>. A dash means "
         "unreported, not zero.\n\n" + pro_table(pro_rows),
     )
