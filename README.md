@@ -27,15 +27,15 @@ Models and prices reflect each provider's official documentation; each system us
 
 | Rank | Provider | Category | Overall | Short | Medium | Long | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|---:|
-| 1 | LlamaExtract Agentic Plus | LlamaExtract | **96.38** | <u>97.15</u> | <u>94.77</u> | <u>94.60</u> | 7.50¢ |
+| 1 | LlamaExtract Agentic Plus | LlamaExtract | **96.17** | <u>97.02</u> | 94.30 | <u>94.65</u> | 7.50¢ |
 | 2 | Reducto Deep Extract | Specialized APIs | <u>96.08</u> | 96.84 | **94.80** | 92.85 | 6.35¢ |
 | 3 | Pulse (Effort) | Specialized APIs | 96.07 | 96.83 | 94.70 | 93.24 | 10.50¢ |
-| 4 | LlamaExtract Agentic | LlamaExtract | 96.03 | 96.81 | 94.21 | **95.05** | 3.12¢ |
+| 4 | LlamaExtract Agentic | LlamaExtract | 95.65 | 96.06 | <u>94.79</u> | **94.73** | 3.12¢ |
 | 5 | Claude Code (Sonnet 5.5 Evidence) | Coding Agents | 94.68 | 96.22 | 92.97 | 83.69 | 5.69¢ |
 | 6 | Codex (GPT-6 Sol Evidence) | Coding Agents | 94.57 | 95.99 | 92.42 | 87.25 | 9.80¢ |
 | 7 | Pulse (Non-effort) | Specialized APIs | 94.51 | 95.39 | 92.49 | 93.31 | 3.00¢ |
-| 8 | Codex (GPT-5.6 Sol Evidence) | Coding Agents | 93.77 | 96.04 | 90.19 | 82.73 | 21.65¢ |
-| 9 | LlamaExtract Cost-Effective | LlamaExtract | 93.67 | 96.07 | 90.21 | 80.48 | 1.00¢ |
+| 8 | LlamaExtract Cost-Effective | LlamaExtract | 94.21 | 95.49 | 91.58 | 90.86 | 1.00¢ |
+| 9 | Codex (GPT-5.6 Sol Evidence) | Coding Agents | 93.77 | 96.04 | 90.19 | 82.73 | 21.65¢ |
 | 10 | Codex (GPT-5.5) | Coding Agents | 93.57 | 95.68 | 91.15 | 78.88 | 27.83¢ |
 
 Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
@@ -50,15 +50,15 @@ Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
     <tr><th align="right">Overall</th><th align="right">Short</th><th align="right">Medium</th><th align="right">Long</th><th align="right">Overall</th><th align="right">Short</th><th align="right">Medium</th><th align="right">Long</th></tr>
   </thead>
   <tbody>
-    <tr><td align="right">1</td><td>LlamaExtract Agentic Plus</td><td align="right"><strong>81.26</strong></td><td align="right"><strong>81.63</strong></td><td align="right"><u>81.18</u></td><td align="right">75.22</td><td align="right"><u>89.94</u></td><td align="right"><u>92.45</u></td><td align="right">86.50</td><td align="right">74.71</td></tr>
-    <tr><td align="right">2</td><td>LlamaExtract Agentic</td><td align="right"><u>78.89</u></td><td align="right"><u>77.63</u></td><td align="right"><strong>81.86</strong></td><td align="right"><strong>80.89</strong></td><td align="right"><strong>90.64</strong></td><td align="right"><strong>92.58</strong></td><td align="right"><u>86.68</u></td><td align="right"><u>87.09</u></td></tr>
-    <tr><td align="right">3</td><td>Codex (GPT-6 Sol Evidence)</td><td align="right">77.11</td><td align="right">77.61</td><td align="right">75.53</td><td align="right"><u>78.31</u></td><td align="right">86.50</td><td align="right">87.20</td><td align="right">85.12</td><td align="right">84.82</td></tr>
-    <tr><td align="right">4</td><td>Claude Code (Opus 5.5 Evidence)</td><td align="right">71.55</td><td align="right">73.57</td><td align="right">65.54</td><td align="right">74.87</td><td align="right">76.95</td><td align="right">79.27</td><td align="right">71.36</td><td align="right">76.47</td></tr>
-    <tr><td align="right">5</td><td>Codex (GPT-6 Luna Evidence)</td><td align="right">65.70</td><td align="right">62.91</td><td align="right">71.11</td><td align="right">74.36</td><td align="right">83.93</td><td align="right">84.41</td><td align="right">83.47</td><td align="right">80.17</td></tr>
-    <tr><td align="right">6</td><td>Claude Code (Sonnet 5.5 Evidence)</td><td align="right">64.61</td><td align="right">64.59</td><td align="right">63.18</td><td align="right">71.22</td><td align="right">75.99</td><td align="right">77.93</td><td align="right">71.50</td><td align="right">74.98</td></tr>
-    <tr><td align="right">7</td><td>Reducto Extract (v4)</td><td align="right">54.97</td><td align="right">60.53</td><td align="right">49.35</td><td align="right">16.30</td><td align="right">75.28</td><td align="right">87.47</td><td align="right">57.38</td><td align="right">18.59</td></tr>
-    <tr><td align="right">8</td><td>Codex (GPT-5.6 Sol Evidence)</td><td align="right">54.66</td><td align="right">50.87</td><td align="right">64.58</td><td align="right">69.01</td><td align="right">83.62</td><td align="right">85.12</td><td align="right">80.77</td><td align="right">78.84</td></tr>
-    <tr><td align="right">9</td><td>LlamaExtract Cost-Effective</td><td align="right">53.65</td><td align="right">49.20</td><td align="right">64.84</td><td align="right">55.66</td><td align="right">80.09</td><td align="right">87.53</td><td align="right">66.47</td><td align="right">54.94</td></tr>
+    <tr><td align="right">1</td><td>LlamaExtract Agentic Plus</td><td align="right"><strong>83.25</strong></td><td align="right"><strong>83.22</strong></td><td align="right"><u>83.44</u></td><td align="right"><strong>82.84</strong></td><td align="right"><strong>88.26</strong></td><td align="right"><strong>87.97</strong></td><td align="right"><u>88.48</u></td><td align="right"><u>90.61</u></td></tr>
+    <tr><td align="right">2</td><td>LlamaExtract Agentic</td><td align="right"><u>82.33</u></td><td align="right"><u>81.39</u></td><td align="right"><strong>84.94</strong></td><td align="right"><u>81.63</u></td><td align="right"><u>88.20</u></td><td align="right">86.95</td><td align="right"><strong>90.33</strong></td><td align="right"><strong>92.59</strong></td></tr>
+    <tr><td align="right">3</td><td>LlamaExtract Cost-Effective</td><td align="right">79.80</td><td align="right">80.99</td><td align="right">77.52</td><td align="right">76.16</td><td align="right">86.28</td><td align="right">86.97</td><td align="right">84.60</td><td align="right">86.41</td></tr>
+    <tr><td align="right">4</td><td>Codex (GPT-6 Sol Evidence)</td><td align="right">77.11</td><td align="right">77.61</td><td align="right">75.53</td><td align="right">78.31</td><td align="right">86.50</td><td align="right">87.20</td><td align="right">85.12</td><td align="right">84.82</td></tr>
+    <tr><td align="right">5</td><td>Claude Code (Opus 5.5 Evidence)</td><td align="right">71.55</td><td align="right">73.57</td><td align="right">65.54</td><td align="right">74.87</td><td align="right">76.95</td><td align="right">79.27</td><td align="right">71.36</td><td align="right">76.47</td></tr>
+    <tr><td align="right">6</td><td>Codex (GPT-6 Luna Evidence)</td><td align="right">65.70</td><td align="right">62.91</td><td align="right">71.11</td><td align="right">74.36</td><td align="right">83.93</td><td align="right">84.41</td><td align="right">83.47</td><td align="right">80.17</td></tr>
+    <tr><td align="right">7</td><td>Claude Code (Sonnet 5.5 Evidence)</td><td align="right">64.61</td><td align="right">64.59</td><td align="right">63.18</td><td align="right">71.22</td><td align="right">75.99</td><td align="right">77.93</td><td align="right">71.50</td><td align="right">74.98</td></tr>
+    <tr><td align="right">8</td><td>Reducto Extract (v4)</td><td align="right">54.97</td><td align="right">60.53</td><td align="right">49.35</td><td align="right">16.30</td><td align="right">75.28</td><td align="right"><u>87.47</u></td><td align="right">57.38</td><td align="right">18.59</td></tr>
+    <tr><td align="right">9</td><td>Codex (GPT-5.6 Sol Evidence)</td><td align="right">54.66</td><td align="right">50.87</td><td align="right">64.58</td><td align="right">69.01</td><td align="right">83.62</td><td align="right">85.12</td><td align="right">80.77</td><td align="right">78.84</td></tr>
     <tr><td align="right">10</td><td>Codex (GPT-5.5 Evidence)</td><td align="right">52.57</td><td align="right">53.13</td><td align="right">48.01</td><td align="right">61.87</td><td align="right">80.64</td><td align="right">83.27</td><td align="right">73.87</td><td align="right">79.90</td></tr>
   </tbody>
 </table>
@@ -146,7 +146,7 @@ A **pipeline** is an extraction system or configuration you want to evaluate. Ru
 
 The four self-hosted pipelines need an endpoint you run yourself; see [.env.example](.env.example). Other configurations of the same systems are registered too (`reducto_extract`, `extend_extract`, `codex_code_extract_gpt_5_5_high`, the two-stage parse baselines, and more). Run `uv run extract-bench pipelines` for the full roster.
 
-All three LlamaExtract tiers return word-level citation boxes, so both grounding metrics are meaningful on each. `llamaextract_agentic_plus` does it natively. `llamaextract_cost_effective` and `llamaextract_agentic` get there by running a parse at their own tier that emits word boxes, which is a second job. `llamaextract_cost_effective_standard_bbox` and `llamaextract_agentic_standard_bbox` are those two tiers without that parse pass: one job instead of two, but citations carry only block-level boxes, so word-level grounding scores near zero.
+The three LlamaExtract leaderboard pipelines select Extract v2.6 with citations enabled and no custom Parse configuration. All three return word-level citation boxes. The `llamaextract_cost_effective_standard_bbox` and `llamaextract_agentic_standard_bbox` variants use the API default version instead of pinning v2.6.
 
 </details>
 
