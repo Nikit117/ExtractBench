@@ -218,9 +218,7 @@ def main() -> None:
     readme = replace_block(
         readme,
         "PRO_LEADERBOARD",
-        "Scores are percentages; costs are USD. Rows are ordered by "
-        "% Perfect, then Value F1, then lower cost. The best score in each "
-        "metric is **bold**; the second-best distinct score is <u>underlined</u>.\n\n" + pro_table(pro_rows),
+        pro_table(pro_rows),
     )
     if args.check:
         if readme != original:

@@ -24,6 +24,8 @@ Read the [ExtractBench launch post](https://www.llamaindex.ai/blog/introducing-e
 
 Models and prices reflect each provider's official documentation; each system uses its recommended configuration. Failed documents and Pro documents exceeding the 30-minute limit score zero. Grounding is evaluated on the subset of documents with verified evidence boxes.
 
+Scores are percentages; costs are USD. Pro rows are ordered by % Perfect, then Value F1, then lower cost. The best score in each metric is **bold**; the second-best distinct score is <u>underlined</u>.
+
 ### ExtractBench leaderboard
 
 <!-- LEADERBOARD:START -->
@@ -84,8 +86,6 @@ Top 10 of 49 systems — full table in [leaderboard.csv](leaderboard.csv).
 **% Perfect** is the percentage of documents with 100% Value F1.
 
 <!-- PRO_LEADERBOARD:START -->
-Scores are percentages; costs are USD. Rows are ordered by % Perfect, then Value F1, then lower cost. The best score in each metric is **bold**; the second-best distinct score is <u>underlined</u>.
-
 | Rank | Provider | Category | % Perfect | Value F1 | Box F1 | Page F1 | ¢ / Page |
 |---:|---|---|---:|---:|---:|---:|---:|
 | 1 | Codex GPT-6 Astra | Coding Agents | **58** | **94.53** | **70.97** | **79.10** | 95.20¢ |
@@ -101,8 +101,6 @@ Scores are percentages; costs are USD. Rows are ordered by % Perfect, then Value
 
 Top 10 of 12 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv).
 <!-- PRO_LEADERBOARD:END -->
-
-The [Pro CSV](leaderboard-pro.csv) includes overall scores and all six challenge slices from the published launch results.
 
 ### Submitting results
 
