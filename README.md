@@ -22,7 +22,7 @@ Read the [ExtractBench launch post](https://www.llamaindex.ai/blog/introducing-e
 
 [ExtractBench](#extractbench-leaderboard) · [ExtractBench Pro](#extractbench-pro-leaderboard) · [Submit results](#submitting-results)
 
-Models and prices reflect each provider's official documentation; each system uses its recommended configuration. Failed documents and Pro documents exceeding the 30-minute limit score zero. Grounding is evaluated on the subset of documents with verified evidence boxes.
+Models and prices reflect each provider's official documentation; each system uses its recommended configuration.
 
 Scores are percentages; costs are USD. Pro rows are ordered by % Perfect, then Value F1, then lower cost. The best score in each metric is **bold**; the second-best distinct score is <u>underlined</u>.
 
@@ -105,6 +105,8 @@ Top 10 of 12 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv
 ### Submitting results
 
 Open a PR updating [leaderboard.csv](leaderboard.csv) or [leaderboard-pro.csv](leaderboard-pro.csv), with your pipeline configuration and evaluation reports. For Pro, include the overall (`all`) row and all six challenge rows. Scores are percentages; costs are USD per page. Regenerate the tables with `uv run python scripts/update_readme.py`.
+
+Failed documents and Pro documents exceeding the 30-minute limit score zero. Grounding is evaluated on the subset of documents with verified evidence boxes.
 
 ## Quick Start
 
