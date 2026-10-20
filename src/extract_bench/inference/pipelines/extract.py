@@ -52,18 +52,6 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
             )
         )
 
-    for _tier in ("cost_effective", "agentic"):
-        register_fn(
-            _pipeline_spec(
-                pipeline_name=f"llamaextract_{_tier}_standard_bbox",
-                provider_name="llamaextract_v2",
-                config={
-                    "tier": _tier,
-                    "cite_sources": True,
-                },
-            )
-        )
-
     # =========================================================================
     # One-shot VLM/LLM APIs (schema-guided structured output over the file)
     # =========================================================================
