@@ -1,6 +1,6 @@
 """Pipeline-name filtering must match whole path components, not substrings.
 
-Several registry names are prefixes of other registry names
+Pipeline names can be prefixes of other pipeline names
 (``llamaextract_agentic`` / ``llamaextract_agentic_plus`` /
 ``llamaextract_agentic_standard_bbox``, ``extend_extract`` /
 ``extend_extract_max``). A substring filter silently mixes the longer

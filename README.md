@@ -146,7 +146,7 @@ A **pipeline** is an extraction system or configuration you want to evaluate. Ru
 
 The four self-hosted pipelines need an endpoint you run yourself; see [.env.example](.env.example). Other configurations of the same systems are registered too (`reducto_extract`, `extend_extract`, `codex_code_extract_gpt_5_5_high`, the two-stage parse baselines, and more). Run `uv run extract-bench pipelines` for the full roster.
 
-The three LlamaExtract leaderboard pipelines select Extract v2.6 with citations enabled and no custom Parse configuration. All three return word-level citation boxes. The `llamaextract_cost_effective_standard_bbox` and `llamaextract_agentic_standard_bbox` variants use the API default version instead of pinning v2.6.
+The three LlamaExtract leaderboard pipelines select Extract v2.6 with citations enabled and no custom Parse configuration. All three return word-level citation boxes.
 
 </details>
 
