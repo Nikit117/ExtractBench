@@ -17,9 +17,8 @@ uv run extract-bench run <pipeline_name>
 
 | Pipeline | Provider | Notes |
 |---|---|---|
-| `llamaextract_cost_effective` / `llamaextract_agentic` | LlamaExtract V2 API | word-grounded citations, via a parse at the same tier (`LLAMA_CLOUD_API_KEY`) |
-| `llamaextract_agentic_plus` | LlamaExtract V2 API | highest tier; returns word-level citation boxes natively, no parse pass needed |
-| `llamaextract_cost_effective_standard_bbox` / `llamaextract_agentic_standard_bbox` | LlamaExtract V2 API | same tiers with block-level citation boxes and no granular parse pass |
+| `llamaextract_cost_effective` / `llamaextract_agentic` | LlamaExtract V2 API | Extract v2.6 with citations enabled (`LLAMA_CLOUD_API_KEY`) |
+| `llamaextract_agentic_plus` | LlamaExtract V2 API | Extract v2.6, highest tier, citations enabled |
 | `openai_gpt_5_4_extract_oneshot_structured_output_file` (+ `_nano`) | OpenAI Responses | one-shot structured output over the uploaded file |
 | `openai_gpt_6_astra_reasoning_low_extract_oneshot_structured_output_file` | OpenAI Responses | one-shot structured output over the uploaded file (reasoning: low) |
 | `gemini_3_5_flash_extract_oneshot_structured_output_file` | Gemini | one-shot structured output (thinking: low) |
@@ -38,10 +37,13 @@ uv run extract-bench run <pipeline_name>
 | `codex_code_extract_gpt_5_5_low_evidence` / `codex_code_extract_gpt_5_6_sol_low_evidence` / `codex_code_extract_gpt_5_6_terra_low_evidence` | Codex CLI | low-effort extraction with page and box citations; unrestricted shell |
 | `codex_code_extract_gpt_5_6_luna_medium_evidence` | Codex CLI | medium-effort extraction with page and box citations; unrestricted shell, no cost cap |
 | `codex_code_extract_gpt_6_luna_medium_evidence` / `codex_code_extract_gpt_6_luna_high_evidence` / `codex_code_extract_gpt_6_luna_xhigh_evidence` / `codex_code_extract_gpt_6_sol_low_evidence` / `codex_code_extract_gpt_6_sol_medium_evidence` / `codex_code_extract_gpt_6_sol_high_evidence` | Codex CLI | GPT-6 Luna and Sol extraction with page and box citations at the effort in the name; unrestricted shell, no cost cap |
+| `codex_code_extract_gpt_6_astra_xhigh_evidence` / `codex_code_extract_gpt_6_1_sol_{low,medium,high,xhigh}_evidence` | Codex CLI | GPT-6 Astra and GPT-6.1 Sol extraction with page and box citations at the effort in the name; unrestricted shell, no cost cap |
+| `codex_code_extract_gpt_6_luna_{low,medium,high,xhigh}_evidence_prompt_opt` | Codex CLI | GPT-6 Luna evidence extraction plus a short prompt addendum: always write the output files, the documents are authorized for extraction, no field needs web access |
 | `reducto_extract` / `reducto_extract_v4` / `reducto_deep_extract` | Reducto | `_v4` uses Reducto's v4 extract model |
 | `extend_extract` / `extend_extract_max` | Extend | citations enabled; max-context array strategy variant |
+| `extend_extract_operator` | Extend | Operator extraction on the 2026-02-09 API with word-level citations; cost from the run's reported usage (`EXTEND_API_KEY`) |
 | `landingai_extract` | LandingAI ADE | |
-| `datalab_parse_accurate_extract_fast` / `_balanced` | Datalab | accurate parse + fast or balanced extraction, JSON tree citations |
+| `datalab_parse_accurate_extract_{fast,balanced,accurate}` | Datalab | accurate parse + fast, balanced or accurate extraction, JSON tree citations |
 | `pulse_schema_non_effort` / `pulse_schema_effort` | Pulse | Pulse Ultra 2, WLBB enabled, then `/schema` with effort off/on (`PULSE_API_KEY`) |
 | `lift_extract` | Self-hosted lift SDK | requires `LIFT_ENDPOINT_URL` |
 | `qwen3_6_35b_a3b_fp8_vllm_extract_oneshot_structured_output_file` | Self-hosted vLLM | Qwen3.6-35B-A3B-FP8, json_object mode; requires `QWEN35_SERVER_URL` |

@@ -303,19 +303,6 @@ def test_public_extract_pipelines_registered() -> None:
     assert llamaextract.config["cite_sources"] is True
     assert "use_staging" not in llamaextract.config
 
-    for tier in ("cost_effective", "agentic"):
-        default = get_pipeline(f"llamaextract_{tier}")
-        parse_config = default.config["parse_config"]
-        assert parse_config["output_options"]["granular_bboxes"] == ["word"]
-        assert parse_config["tier"] == tier
-        assert default.config["parse_tier"] == tier
-        assert "use_staging" not in default.config
-
-        standard = get_pipeline(f"llamaextract_{tier}_standard_bbox")
-        assert standard.config["tier"] == tier
-        assert "parse_config" not in standard.config
-        assert standard.config["cite_sources"] is True
-
     openai_oneshot = get_pipeline("openai_gpt_5_4_extract_oneshot_structured_output_file")
     assert openai_oneshot.provider_name == "openai_extract"
     assert openai_oneshot.config["model"] == "gpt-5.4"

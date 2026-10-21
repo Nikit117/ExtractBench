@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import time
 from pathlib import Path
 from typing import Any
 
@@ -348,6 +349,30 @@ def test_run_inference_reads_codex_output(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert raw.raw_output["_config"]["sandbox"] == "workspace-write"
     assert raw.raw_output["_last_message_tail"] == ""
     assert captured["env"]["CODEX_API_KEY"] == "sk-test"
+
+
+def test_a_run_longer_than_20_minutes_is_not_stopped_by_the_provider(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The provider used to kill the CLI at 20 minutes and the runner restarted the document from zero.
+    Only the run's per-file timeout may stop it now: here every clock reading is an hour later."""
+    fake = _FakePopen([json.dumps({"type": "thread.started", "thread_id": "t"}), _turn_completed()])
+
+    def factory(cmd: list[str], *args: Any, cwd: str | None = None, **kwargs: Any) -> _FakePopen:
+        assert cwd is not None
+        (Path(cwd) / "output.json").write_text(json.dumps({"invoice_number": "A1"}), encoding="utf-8")
+        return fake
+
+    monkeypatch.setattr(subprocess, "Popen", factory)
+    hours = iter(range(0, 10**9, 3600))
+    monkeypatch.setattr(time, "monotonic", lambda: float(next(hours)))
+
+    raw = Provider("codex_code_extract", {"api_key": "sk-test"}).run_inference(
+        _pipeline(), _request(str(_png(tmp_path)))
+    )
+
+    assert raw.raw_output["data"] == {"invoice_number": "A1"}
+    assert not fake.terminate_called
 
 
 def test_run_inference_rejects_bwrap_sandbox_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

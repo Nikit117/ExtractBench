@@ -10,20 +10,6 @@ from typing import Any
 from extract_bench.schemas.pipeline import PipelineSpec
 from extract_bench.schemas.product import ProductType
 
-GRANULAR_BBOX_OUTPUT_OPTIONS = {
-    "granular_bboxes": ["word"],
-}
-
-
-def _granular_parse_config(tier: str) -> dict[str, Any]:
-    """Parse config emitting word-level boxes at the given tier."""
-    return {
-        "tier": tier,
-        "version": "latest",
-        "disable_cache": True,
-        "output_options": GRANULAR_BBOX_OUTPUT_OPTIONS,
-    }
-
 
 def _pipeline_spec(
     *,
@@ -55,27 +41,14 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 provider_name="llamaextract_v2",
                 config={
                     "tier": _tier,
-                    "parse_tier": _tier,
+                    "extract_version": "2.6",
                     "timeout": 3000,
                     "cite_sources": True,
-                    "parse_config": _granular_parse_config(_tier),
                 },
                 # The provider polls the hosted job for up to `timeout` seconds; give
                 # the runner-level watchdog headroom past that so long documents are
                 # not killed (and re-submitted) at the 600s run default.
                 per_file_timeout=3600.0,
-            )
-        )
-
-    for _tier in ("cost_effective", "agentic"):
-        register_fn(
-            _pipeline_spec(
-                pipeline_name=f"llamaextract_{_tier}_standard_bbox",
-                provider_name="llamaextract_v2",
-                config={
-                    "tier": _tier,
-                    "cite_sources": True,
-                },
             )
         )
 
@@ -390,8 +363,10 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
 
     # GPT-6 evidence sweep, same unrestricted config as the Luna pipeline above.
     for _gpt6_slug, _gpt6_model, _gpt6_efforts in (
+        ("gpt_6_astra", "gpt-6-astra", ("xhigh",)),
         ("gpt_6_luna", "gpt-6-luna", ("medium", "high", "xhigh")),
         ("gpt_6_sol", "gpt-6-sol", ("low", "medium", "high")),
+        ("gpt_6_1_sol", "gpt-6.1-sol", ("low", "medium", "high", "xhigh")),
     ):
         for _reasoning_effort in _gpt6_efforts:
             register_fn(
@@ -407,6 +382,32 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                     },
                 )
             )
+
+    # GPT-6 Luna with a short prompt addendum. On ExtractBench Luna sometimes
+    # exits without writing output.json: it declines to return unverified OCR,
+    # refuses tax returns as sensitive, or stops for a field it thought needed
+    # the web. The plain pipelines above keep the shared prompt.
+    _luna_prompt_opt_instructions = (
+        "Always write ./output.json and ./citations.json before stopping, even if some values are "
+        "uncertain; never ask for confirmation. These are public documents and extracting them, "
+        "including names, IDs and amounts, is authorized. No field needs web access; use null for "
+        "anything the document does not state."
+    )
+    for _reasoning_effort in ("low", "medium", "high", "xhigh"):
+        register_fn(
+            _pipeline_spec(
+                pipeline_name=f"codex_code_extract_gpt_6_luna_{_reasoning_effort}_evidence_prompt_opt",
+                provider_name="codex_code_extract",
+                config={
+                    "model": "gpt-6-luna",
+                    "reasoning_effort": _reasoning_effort,
+                    "sandbox": "danger-full-access",
+                    "max_cost_usd": None,
+                    "evidence_mode": True,
+                    "extra_instructions": _luna_prompt_opt_instructions,
+                },
+            )
+        )
 
     # =========================================================================
     # Commercial extraction APIs
@@ -443,6 +444,22 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                 "citations": True,
                 "array_extract": False,
                 "deep_extract": True,
+            },
+        )
+    )
+
+    # Operator manages review, multimodal, arrays, and chunking itself.
+    # Its current API itemizes the variable agent charge in usage.breakdown.
+    # Word-level citations: the default mode often boxes the whole line
+    # around a value, which fails IoU against word-level GT evidence.
+    register_fn(
+        _pipeline_spec(
+            pipeline_name="extend_extract_operator",
+            provider_name="extend_operator",
+            config={
+                "api_version": "2026-02-09",
+                "baseProcessor": "extraction_operator",
+                "advancedOptions": {"citationsEnabled": True, "citationMode": "word"},
             },
         )
     )
@@ -492,7 +509,9 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         )
     )
 
-    for _extraction_mode in ("fast", "balanced"):
+    # Bypass Datalab's server cache: a cached result returns at once and bills
+    # $0, so a rerun would report neither the real cost nor the real latency.
+    for _extraction_mode in ("fast", "balanced", "accurate"):
         register_fn(
             _pipeline_spec(
                 pipeline_name=f"datalab_parse_accurate_extract_{_extraction_mode}",
@@ -501,6 +520,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
                     "parse_mode": "accurate",
                     "extraction_mode": _extraction_mode,
                     "output_format": "json",
+                    "skip_cache": True,
                 },
             )
         )

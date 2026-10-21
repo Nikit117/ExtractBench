@@ -7,6 +7,11 @@ normalized through the standard Extract output path. Codex differs in one
 important way: the CLI does not expose a native dollar budget flag or a terminal
 ``total_cost_usd`` event, so cost is estimated post-hoc from the
 ``turn.completed.usage`` token counts.
+
+Each document gets one run, with no time limit of its own: the runner does not retry
+it, and only the run's per-file timeout stops it (the runner then kills the CLI via
+``cancel``). A provider-side limit used to kill a run at 20 minutes and the runner
+restarted the document from zero, while latency and cost kept only the last run.
 """
 
 from __future__ import annotations
@@ -17,7 +22,6 @@ import shutil
 import subprocess
 import tempfile
 import threading
-import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -76,7 +80,11 @@ _DEFAULT_DISABLED_FEATURES = (
 )
 
 # USD per million tokens (input, cached input, output); estimates use Codex CLI JSONL usage.
+# Cached input is input/10 across the table (input/20 for gpt-6.1-sol), matching
+# OpenAI's cached-token discount.
 _OPENAI_CODEX_PRICING_PER_M: dict[str, tuple[float, float, float]] = {
+    "gpt-6-astra": (10.00, 1.00, 50.00),
+    "gpt-6.1-sol": (2.00, 0.10, 10.00),
     "gpt-6-sol": (2.00, 0.20, 10.00),
     "gpt-6-luna": (0.10, 0.01, 0.50),
     "gpt-5.6-sol": (4.00, 0.40, 20.00),
@@ -91,31 +99,16 @@ _OPENAI_CODEX_PRICING_PER_M: dict[str, tuple[float, float, float]] = {
 # USD per million cache-write tokens (Codex's cache_write_input_tokens, a subset of
 # the uncached input). A model absent here prices cache writes as uncached input.
 _OPENAI_CODEX_CACHE_WRITE_PER_M: dict[str, float] = {
+    "gpt-6-astra": 12.50,
+    "gpt-6.1-sol": 2.50,
     "gpt-6-sol": 2.50,
     "gpt-6-luna": 0.125,
 }
 
 _LONG_CONTEXT_THRESHOLD_TOKENS = 272_000
-# GPT-6 is absent: Codex caps gpt-6-sol/luna at model_context_window=258400, so no
-# single request reaches OpenAI's per-request 272K threshold.
+# GPT-6 and GPT-6.1 are absent: Codex caps gpt-6-astra/sol/luna/gpt-6.1-sol at
+# model_context_window=258400, so no single request reaches OpenAI's per-request 272K threshold.
 _LONG_CONTEXT_MODELS = ("gpt-5.6-sol", "gpt-5.5", "gpt-5.4")
-
-
-def _extraction_is_empty(data: Any) -> bool:
-    """True when a JSON tree holds no non-empty scalar at any depth.
-
-    None, "", empty lists/dicts and any nesting of them count as empty;
-    numbers (including 0), booleans and non-empty strings count as values.
-    """
-    if isinstance(data, dict):
-        return all(_extraction_is_empty(v) for v in data.values())
-    if isinstance(data, list):
-        return all(_extraction_is_empty(v) for v in data)
-    if data is None:
-        return True
-    if isinstance(data, str):
-        return data.strip() == ""
-    return False
 
 
 @register_provider("codex_code_extract")
@@ -123,13 +116,12 @@ class CodexCodeExtractProvider(Provider):
     """Agentic extraction by shelling out to the Codex CLI (`codex exec`)."""
 
     DEFAULT_MODEL = "gpt-5.4"
-    DEFAULT_TIMEOUT_S = 1200
+    retries_transient_errors = False  # one run per document (see module docstring)
     DEFAULT_MAX_COST_USD = 5.00
 
     def __init__(self, provider_name: str, base_config: dict[str, Any] | None = None):
         super().__init__(provider_name, base_config)
         self._model: str = self.base_config.get("model", self.DEFAULT_MODEL)
-        self._timeout_s: int = int(self.base_config.get("timeout_s", self.DEFAULT_TIMEOUT_S))
         self._max_cost_usd: float | None = self.base_config.get("max_cost_usd", self.DEFAULT_MAX_COST_USD)
         self._codex_bin: str = self.base_config.get("codex_bin", "codex")
         # SECURITY: the CLI runs on the host with `--ask-for-approval never`, so
@@ -148,10 +140,6 @@ class CodexCodeExtractProvider(Provider):
         # Optional pipeline-specific lines appended to the task prompt, e.g. to
         # tell a model whether this environment can display images to it.
         self._extra_instructions: str = str(self.base_config.get("extra_instructions") or "").strip()
-        # Treat an output.json with no non-empty values as a failed attempt and
-        # retry (observed: some proxied models occasionally write an all-null
-        # JSON that would otherwise count as success and score 0).
-        self._retry_empty_output: bool = bool(self.base_config.get("retry_empty_output", False))
 
         self._promote_repeated: bool = bool(self.base_config.get("promote_repeated_structure", True))
         self._additional_properties_false: bool = bool(self.base_config.get("additional_properties_false", True))
@@ -306,8 +294,6 @@ class CodexCodeExtractProvider(Provider):
             with self._procs_lock:
                 self._procs[example_id] = proc
 
-            deadline = time.monotonic() + self._timeout_s
-
             try:
                 if proc.stdin is not None:
                     try:
@@ -318,23 +304,11 @@ class CodexCodeExtractProvider(Provider):
 
                 assert proc.stdout is not None
                 for raw_line in proc.stdout:
-                    if time.monotonic() > deadline:
-                        self._terminate(proc)
-                        raise subprocess.TimeoutExpired(cmd, self._timeout_s)
                     line = raw_line.rstrip("\n")
                     if line:
                         lines.append(line)
 
-                try:
-                    remaining = max(1.0, deadline - time.monotonic())
-                    proc.wait(timeout=remaining)
-                except subprocess.TimeoutExpired:
-                    self._terminate(proc)
-                    raise
-            except subprocess.TimeoutExpired as e:
-                raise ProviderTransientError(
-                    f"codex_code_extract timed out after {self._timeout_s}s; subprocess killed."
-                ) from e
+                proc.wait()
             finally:
                 with self._procs_lock:
                     self._procs.pop(example_id, None)
@@ -666,7 +640,6 @@ class CodexCodeExtractProvider(Provider):
     def _config_snapshot(self) -> dict[str, Any]:
         return {
             "model": self._model,
-            "timeout_s": self._timeout_s,
             "max_cost_usd": self._max_cost_usd,
             "sandbox": self._sandbox,
             "reasoning_effort": self._reasoning_effort,
@@ -737,10 +710,6 @@ class CodexCodeExtractProvider(Provider):
                 self._raise_for_status(returncode, lines, stderr_tail)
                 self._raise_for_sandbox_failures(lines)
                 data = self._read_output_json(output_path)
-                if self._retry_empty_output and _extraction_is_empty(data):
-                    raise ProviderTransientError(
-                        "codex_code_extract: output.json contains no non-empty values; retrying the document."
-                    )
                 if self._evidence_mode:
                     agent_citations = read_agent_citations_file(workdir / "citations.json")
                 last_message_tail = self._read_stderr_tail(last_message_path)
