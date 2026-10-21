@@ -1,60 +1,36 @@
-"""Provider for the KYNEX (gpt-5.4) on ExtractBench.
+"""Run a pinned KYNEX harness in an automatically provisioned virtual environment.
 
-The harness is the local TUI agent: it stages the document, lets the model call
-tools (``read_page``, ``extract_table``, Document-Intelligence layout analysis,
-vision) and returns schema-shaped JSON. This provider runs one harness
-extraction per request and hands the extracted JSON to the official evaluator.
+The first extraction clones https://github.com/Nikit117/kynex-harness and
+installs its requirements into an isolated cache. Later extractions reuse that
+installation. Set KYNEX_CACHE_DIR to choose the cache location; Azure OpenAI
+and Document Intelligence credentials come from the process environment.
 
-It deliberately calls the *same* helpers as the benchmark runner
-(``autonomous_document_harness/scripts/run_tui_benchmark_v2.py``), so the
-submitted system is the system that was measured: the non-record pruning rules,
-the redaction-marker rule, the bulk enumeration of long record lists and the
-staging-time OCR fallback for image-only pages all apply.
-
-The harness returns no per-field citation boxes, so ``field_citations`` is empty
-and the grounding metrics are N/A for this system -- the same situation as the
-other value-only entries on the leaderboard.
-
-Like the leaderboard's coding-agent pipelines (``claude_code_extract_*``,
-``codex_code_extract_*``) this provider runs the extraction as a **local
-subprocess** -- ``scripts/extract_one.py`` -- so the official environment needs
-no extra Python packages. The interpreter is taken from
-``KYNEX_HARNESS_PYTHON`` (default: the repository's own ``.venv``), and the
-repository root from ``KYNEX_HARNESS_ROOT``.
-
-To register it with the official CLI, add to
-``extract_bench/inference/providers/extract/__init__.py``::
-
-    from .nikit_harness import KynexExtractProvider  # noqa: F401
-
-and to ``extract_bench/inference/pipelines/extract.py``::
-
-    register_fn(
-        _pipeline_spec(
-            pipeline_name="nikit_harness_gpt_5_4",
-            provider_name="nikit_harness_extract",
-            config={"timeout": 3600},
-            per_file_timeout=3600.0,
-        )
-    )
+The upstream agent and post-processing rules run unchanged. No per-field
+citation boxes are emitted, so field_citations is empty.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import subprocess
 import sys
 import tempfile
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from filelock import FileLock, Timeout
+
 from extract_bench.inference.providers.base import (
     Provider,
+    ProviderConfigError,
     ProviderPermanentError,
 )
+from extract_bench.inference.providers.registry import register_provider
 from extract_bench.schemas.extract_output import ExtractOutput
 from extract_bench.schemas.pipeline_io import (
     InferenceRequest,
@@ -63,14 +39,13 @@ from extract_bench.schemas.pipeline_io import (
 )
 from extract_bench.schemas.product import ProductType
 
-DEFAULT_REPO_ROOT = Path(os.getenv("KYNEX_HARNESS_ROOT") or r"C:\path\to\kynex-harness")
+logger = logging.getLogger(__name__)
 
-# The harness rules that were enabled for the measured 370-document benchmark
-# run (official ExtractBench scorer).  They are passed to the subprocess
-# explicitly so the submitted system is the system that was measured: most of
-# the rules default to ON in the harness, but ``ADH_BULK_ARRAYS`` is opt-in and
-# would otherwise be silently OFF in the official environment, which drops the
-# bulk enumeration of long record lists.
+HARNESS_REPOSITORY = "https://github.com/Nikit117/kynex-harness.git"
+HARNESS_REVISION = "4e0d9dcd741173287dc361408143a95f9538de1b"
+_SETUP_TIMEOUT_S = 900
+
+# Preserve the rule switches from the submitted benchmark configuration.
 HARNESS_ENV: dict[str, str] = {
     "ADH_BULK_ARRAYS": "1",
     "ADH_PRUNE_NON_RECORDS": "1",
@@ -81,31 +56,93 @@ HARNESS_ENV: dict[str, str] = {
 }
 
 
-def _harness_python() -> str:
-    """The interpreter that has the harness' dependencies."""
-    explicit = os.getenv("KYNEX_HARNESS_PYTHON", "").strip()
-    if explicit:
-        return explicit
-    candidate = DEFAULT_REPO_ROOT / ".venv" / "Scripts" / "python.exe"
-    if candidate.exists():
-        return str(candidate)
-    return sys.executable
+def _run_setup(command: Sequence[str], *, cwd: Path | None = None) -> str:
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=_SETUP_TIMEOUT_S,
+        )
+    except subprocess.CalledProcessError as exc:
+        detail = exc.stderr if exc.stderr is not None and len(exc.stderr) > 0 else exc.stdout
+        if detail is None:
+            detail = str(exc)
+        raise ProviderConfigError(f"KYNEX setup failed: {detail[-2000:]}") from exc
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ProviderConfigError(f"KYNEX setup failed: {exc}") from exc
+    return result.stdout.strip()
 
 
-async def _extract_async(source: Path, schema: dict[str, Any], timeout: float) -> dict[str, Any]:
-    """Run the harness extraction as a subprocess and return the JSON."""
+def _ensure_harness() -> tuple[Path, Path]:
+    """Publish a complete pinned installation under a process-shared lock."""
+    root = Path(os.environ.get("KYNEX_CACHE_DIR", str(Path.home() / ".cache" / "extract-bench" / "kynex")))
+    cache = root.expanduser().resolve() / HARNESS_REVISION / f"py{sys.version_info.major}.{sys.version_info.minor}"
+    cache.mkdir(parents=True, exist_ok=True)
+    repo = cache / "repo"
+    environment = cache / "venv"
+    python = environment / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    ready = cache / "ready"
+    try:
+        with FileLock(cache / "setup.lock", timeout=_SETUP_TIMEOUT_S):
+            if not repo.exists():
+                logger.info("Cloning KYNEX at %s", HARNESS_REVISION)
+                with tempfile.TemporaryDirectory(prefix="clone-", dir=cache) as staging:
+                    checkout = Path(staging) / "repo"
+                    _run_setup(
+                        [
+                            "git",
+                            "clone",
+                            "--no-checkout",
+                            HARNESS_REPOSITORY,
+                            str(checkout),
+                        ]
+                    )
+                    _run_setup(["git", "checkout", "--detach", HARNESS_REVISION], cwd=checkout)
+                    checkout.rename(repo)
+            actual_revision = _run_setup(["git", "rev-parse", "HEAD"], cwd=repo)
+            changes = _run_setup(["git", "status", "--porcelain"], cwd=repo)
+            if actual_revision != HARNESS_REVISION or len(changes) > 0:
+                raise ProviderConfigError(f"Cached KYNEX checkout differs from {HARNESS_REVISION}: {repo}")
+            if ready.exists() and python.exists() and ready.read_text(encoding="utf-8") == HARNESS_REVISION:
+                return repo, python
+            ready.unlink(missing_ok=True)
+            logger.info("Installing KYNEX dependencies in %s", environment)
+            _run_setup([sys.executable, "-m", "venv", str(environment)])
+            _run_setup(
+                [
+                    str(python),
+                    "-m",
+                    "pip",
+                    "install",
+                    "--disable-pip-version-check",
+                    "--no-input",
+                    "--requirement",
+                    str(repo / "requirements.txt"),
+                ],
+                cwd=repo,
+            )
+            ready.write_text(HARNESS_REVISION, encoding="utf-8")
+    except Timeout as exc:
+        raise ProviderConfigError(f"Timed out waiting for KYNEX setup: {cache}") from exc
+    return repo, python
+
+
+async def _extract_async(
+    source: Path, schema: dict[str, Any], timeout: float, repo: Path, python: Path
+) -> dict[str, Any]:
+    """Run one extraction in the managed harness environment."""
 
     def _run() -> dict[str, Any]:
-        repo = Path(os.getenv("KYNEX_HARNESS_ROOT") or DEFAULT_REPO_ROOT)
         script = repo / "autonomous_document_harness" / "scripts" / "extract_one.py"
-        if not script.exists():
-            raise ProviderPermanentError(f"harness entry point not found: {script} (set KYNEX_HARNESS_ROOT)")
         with tempfile.TemporaryDirectory() as td:
             schema_file = Path(td) / "schema.json"
             schema_file.write_text(json.dumps(schema), encoding="utf-8")
             out_file = Path(td) / "extraction.json"
             cmd = [
-                _harness_python(),
+                str(python),
                 "-I",
                 str(script),
                 "--source",
@@ -132,19 +169,14 @@ async def _extract_async(source: Path, schema: dict[str, Any], timeout: float) -
             if not out_file.exists():
                 raise ProviderPermanentError("harness produced no extraction file")
             extraction = json.loads(out_file.read_text(encoding="utf-8"))
-        return {"extraction": extraction}
+        return {"extraction": extraction, "harness_revision": HARNESS_REVISION}
 
     return await asyncio.get_running_loop().run_in_executor(None, _run)
 
 
+@register_provider("kynex_extract")
 class KynexExtractProvider(Provider):
-    """Provider for the KYNEX on ExtractBench.
-
-    Configuration options:
-        - ``timeout`` (int, default 3600): per-document timeout in seconds. A
-          long document (192 pages) needs the bulk page-wise enumeration, which
-          is the slowest path in the harness.
-    """
+    """KYNEX extraction with a per-document timeout (default: 3600 seconds)."""
 
     def __init__(self, provider_name: str, base_config: dict[str, Any] | None = None):
         super().__init__(provider_name, base_config)
@@ -157,15 +189,16 @@ class KynexExtractProvider(Provider):
             )
         if not request.schema_override:
             raise ProviderPermanentError("schema_override is required for EXTRACT product type.")
-        source = Path(request.source_file_path)
+        source = Path(request.source_file_path).resolve()
         if not source.exists():
             raise ProviderPermanentError(f"File not found: {source}")
 
+        repo, python = _ensure_harness()
         started_at = datetime.now()
         try:
             raw_output = asyncio.run(
                 asyncio.wait_for(
-                    _extract_async(source, request.schema_override, self._timeout),
+                    _extract_async(source, request.schema_override, self._timeout, repo, python),
                     timeout=self._timeout,
                 )
             )
@@ -196,7 +229,7 @@ class KynexExtractProvider(Provider):
             example_id=raw_result.request.example_id,
             pipeline_name=raw_result.pipeline_name,
             extracted_data=extracted_data,
-            field_citations=[],  # the harness emits no per-field citation boxes
+            field_citations=[],
         )
         return InferenceResult(
             request=raw_result.request,
