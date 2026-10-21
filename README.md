@@ -365,6 +365,25 @@ This creates the provider, registers the pipeline, and updates docs. The skill d
 
 </details>
 
+### Harbor
+
+[ExtractBench](https://huggingface.co/datasets/llamaindex/ExtractBench) and
+[ExtractBench Pro](https://huggingface.co/datasets/llamaindex/ExtractBenchPro) are
+available as Harbor tasks. With Harbor 0.24.0+, Docker, Git LFS, and your model's
+API credentials configured, these commands download the tasks and run an agent:
+
+```bash
+git lfs install
+harbor run --repo https://huggingface.co/datasets/llamaindex/ExtractBench -p tasks \
+  -a codex -m <model_name> --allow-agent-host <model_api_host>
+harbor run --repo https://huggingface.co/datasets/llamaindex/ExtractBenchPro -p tasks \
+  -a codex -m <model_name> --allow-agent-host <model_api_host>
+```
+
+Replace `<model_name>` and `<model_api_host>` with your model and its API hostname. Add
+`-l 1 -n 1` to try a single task. See [Harbor usage](docs/harbor.md) for downloading
+without running, local runs, and scoring details.
+
 ## Configuration
 
 ### API Keys
