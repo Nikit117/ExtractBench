@@ -922,11 +922,7 @@ def register_extract_pipelines(register_fn) -> None:  # type: ignore[no-untyped-
         )
     )
 
-    # KYNEX is a local tool-using agent (gpt-5.4 on Azure OpenAI
-    # with Azure Document Intelligence for layout).  It runs as a subprocess, like
-    # the other coding-agent pipelines, so the official environment needs no extra
-    # Python packages: clone https://github.com/Nikit117/kynex-harness and set KYNEX_HARNESS_ROOT to that
-    # checkout, KYNEX_HARNESS_PYTHON to an interpreter with its dependencies.
+    # The provider provisions a pinned KYNEX checkout and isolated dependencies.
     register_fn(
         _pipeline_spec(
             pipeline_name="kynex_gpt_5_4",
