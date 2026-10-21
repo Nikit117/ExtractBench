@@ -102,13 +102,13 @@ Rows are ordered by % Perfect, then Value F1, then lower cost.
 | 3 | LlamaExtract Agentic Plus | LlamaExtract | 38 | <u>77.70</u> | 60.39 | 7.50¢ |
 | 4 | Extend Operator | Specialized APIs | 34 | 73.87 | 57.75 | 9.88¢ |
 | 5 | Claude Code Sonnet 5.5 | Coding Agents | 32 | 73.62 | 40.47 | 19.98¢ |
-| 6 | LlamaExtract Agentic | LlamaExtract | 20 | 71.32 | 58.01 | 3.12¢ |
-| 7 | Pulse Effort | Specialized APIs | 18 | 70.53 | 18.74 | 10.50¢ |
-| 8 | Codex GPT-6.1 Sol | Coding Agents | 12 | 74.06 | <u>63.96</u> | 13.86¢ |
-| 9 | Reducto Deep | Specialized APIs | 3 | 56.35 | 42.20 | 6.18¢ |
-| 10 | Datalab Accurate | Specialized APIs | 2 | 43.93 | 0.32 | 15.75¢ |
+| 6 | Gemini CLI (Gemini 4 Argon Medium) | Coding Agents | 30 | 42.44 | 33.90 | 18.16¢ |
+| 7 | LlamaExtract Agentic | LlamaExtract | 20 | 71.32 | 58.01 | 3.12¢ |
+| 8 | Pulse Effort | Specialized APIs | 18 | 70.53 | 18.74 | 10.50¢ |
+| 9 | Codex GPT-6.1 Sol | Coding Agents | 12 | 74.06 | <u>63.96</u> | 13.86¢ |
+| 10 | Reducto Deep | Specialized APIs | 3 | 56.35 | 42.20 | 6.18¢ |
 
-Top 10 of 12 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv).
+Top 10 of 13 systems — full table in [leaderboard-pro.csv](leaderboard-pro.csv).
 <!-- PRO_LEADERBOARD:END -->
 
 ### Submitting results
@@ -194,7 +194,7 @@ Each download writes a `<stem>.pdf` and `<stem>.test.json` per document and reco
 A **pipeline** is an extraction system or configuration you want to evaluate. Run `uv run extract-bench pipelines` for the live list, or see [docs/pipelines.md](docs/pipelines.md). The pipeline names behind each leaderboard row are listed in [ExtractBench: leaderboard pipelines](docs/extractbench.md#leaderboard-pipelines) and [ExtractBench Pro: leaderboard pipelines](docs/extractbench-pro.md#leaderboard-pipelines).
 
 > [!NOTE]
-> `claude_code_extract_*` and `codex_code_extract_*` run a coding agent on your machine, so they execute local shell commands against benchmark documents. Run them in a container or VM. Every other pipeline is an ordinary API call.
+> Coding-agent pipelines execute local shell commands against benchmark documents. Run them in a container or VM.
 
 The parse and layout-detection rosters inherited from [ParseBench](https://github.com/run-llama/ParseBench) are still registered and runnable by name; list them with `extract-bench pipelines --parse`, `--layout`, or `--all`. They are hidden from the default listing because this benchmark scores extraction; the two-stage extract pipelines use them internally as their parse stage.
 
