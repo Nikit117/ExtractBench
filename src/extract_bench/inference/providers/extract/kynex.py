@@ -42,7 +42,7 @@ from extract_bench.schemas.product import ProductType
 logger = logging.getLogger(__name__)
 
 HARNESS_REPOSITORY = "https://github.com/Nikit117/kynex-harness.git"
-HARNESS_REVISION = "4e0d9dcd741173287dc361408143a95f9538de1b"
+HARNESS_REVISION = "d50a78d9ee99a076e05e8d8942dfe3e2152e9065"
 _SETUP_TIMEOUT_S = 900
 
 # Preserve the rule switches from the submitted benchmark configuration.
