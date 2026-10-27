@@ -436,3 +436,4 @@ src/extract_bench/
 ## License
 
 The code and both datasets (ExtractBench and ExtractBench Pro) are released under the [Apache 2.0 License](LICENSE).
+
