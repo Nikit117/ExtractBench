@@ -345,7 +345,7 @@ ExtractBench does not use LLM-as-a-judge; all value scoring is deterministic. Yo
 ### KYNEX
 
 `kynex_gpt_5_4` automatically clones [the harness](https://github.com/Nikit117/kynex-harness)
-at revision `4e0d9dcd741173287dc361408143a95f9538de1b` and installs its
+at revision `87a7315f4fb9c4e499f1c0599ff6d8d4d2b0ae91` and installs its
 `requirements.txt` in an isolated virtual environment on the first extraction.
 Git and Python's `venv`/pip support must be available. Subsequent requests reuse
 the installation under `~/.cache/extract-bench/kynex/`; set `KYNEX_CACHE_DIR`
