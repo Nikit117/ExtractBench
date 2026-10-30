@@ -29,7 +29,6 @@ dependencies = [
     "autoevals>=0.0.20",
     "beautifulsoup4>=4.12.0",
     "bleach>=6.0.0",
-    "filelock>=3.13",
     "fire>=0.7.1",
     "fuzzysearch>=0.7.3",
     "huggingface-hub>=0.20.0",
@@ -67,6 +66,7 @@ runners = [
     "datalab-python-sdk",
     "docling-core>=2.71.0",
     "extend-ai>=1.16.0",
+    "filelock>=3.13",
     "google-cloud-documentai>=2.20.0",
     "google-genai>=1.0.0",
     "httpx>=0.28.0",
@@ -84,6 +84,7 @@ runners = [
     "warp-ingest[ocr]>=2.0.1",
 ]
 llamaextract = ["llama-cloud>=1.4.1", "httpx>=0.28.0"]
+kynex = ["filelock>=3.13"]
 openai = ["openai>=1.0.0", "pdf2image>=1.16.0", "pillow>=10.0.0", "pymupdf>=1.24.0", "pypdf>=6.4.0"]
 anthropic = ["anthropic>=0.77.1", "pdf2image>=1.16.0", "pillow>=10.0.0", "pymupdf>=1.24.0", "pypdf>=6.4.0"]
 google = ["google-genai>=1.0.0", "httpx>=0.28.0", "pdf2image>=1.16.0", "pillow>=10.0.0", "pymupdf>=1.24.0", "pypdf>=6.4.0"]
