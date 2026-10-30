@@ -77,23 +77,6 @@ The four self-hosted pipelines need an endpoint you run yourself; see [.env.exam
 
 The three LlamaExtract leaderboard pipelines select Extract v2.6 with citations enabled and no custom Parse configuration. All three return word-level citation boxes.
 
-### KYNEX verification
-
-[Independent verification](https://github.com/run-llama/ExtractBench/pull/84#issuecomment-6512168305) covers all 370 original documents using GPT-5.4 and Azure Document Intelligence `prebuilt-layout`, with harness revision `87a7315f4fb9c4e499f1c0599ff6d8d4d2b0ae91`.
-
-| Split | Documents | Value F1 | Precision | Recall | ¢ / page | Seconds / document |
-|---|---:|---:|---:|---:|---:|---:|
-| Short | 252 | 94.29 | 94.04 | 94.90 | 8.42 | 118.8 |
-| Medium | 98 | 92.48 | 93.55 | 91.75 | 3.46 | 245.3 |
-| Long | 20 | 78.77 | 85.61 | 75.46 | 5.80 | 653.9 |
-| Overall | 370 | 92.97 | 93.45 | 93.02 | 4.96 | 181.3 |
-
-Value scores are document-level macro averages from the pinned official scorer. The harness emits no field citations, so word- and page-grounding scores remain zero. Latency is the mean recorded provider duration per document.
-
-The full-workload estimate is **$241.53** over 4,869 source pages: **$191.64** for model calls and **$49.89** for Document Intelligence. Prices are $2.50 / $0.25 / $15 per million uncached-input / cached-input / output tokens, with the long-context multipliers applied per request, and $10 per 1,000 Layout pages. Free-tier credits are excluded.
-
-Pricing starts with a cold prompt cache for each document, then assumes hits for the full unchanged input prefix from earlier completed calls within that document, including conversation history and tool results. It uses a 1,024-token minimum and rounds cached prefixes down to 128-token increments. Cross-document sharing is excluded. Costs are estimates from known usage; unmetered failed requests are additional.
-
 ## Cost of a full run
 
 Costs use each provider's official listed price.

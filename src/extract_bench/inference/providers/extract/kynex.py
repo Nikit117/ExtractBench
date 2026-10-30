@@ -176,11 +176,11 @@ async def _extract_async(
 
 @register_provider("kynex_extract")
 class KynexExtractProvider(Provider):
-    """KYNEX extraction with a per-document timeout (default: 3600 seconds)."""
+    """KYNEX extraction with a per-document timeout (default: 1800 seconds)."""
 
     def __init__(self, provider_name: str, base_config: dict[str, Any] | None = None):
         super().__init__(provider_name, base_config)
-        self._timeout = int(self.base_config.get("timeout", 3600))
+        self._timeout = int(self.base_config.get("timeout", 1800))
 
     def run_inference(self, pipeline: Any, request: InferenceRequest) -> RawInferenceResult:
         if request.product_type != ProductType.EXTRACT:
