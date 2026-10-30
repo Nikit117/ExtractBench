@@ -1677,6 +1677,9 @@ google = [
     { name = "pymupdf" },
     { name = "pypdf" },
 ]
+kynex = [
+    { name = "filelock" },
+]
 landingai = [
     { name = "landingai-ade" },
 ]
@@ -1717,6 +1720,7 @@ runners = [
     { name = "datalab-python-sdk" },
     { name = "docling-core" },
     { name = "extend-ai" },
+    { name = "filelock" },
     { name = "google-cloud-documentai" },
     { name = "google-genai" },
     { name = "httpx" },
@@ -1756,6 +1760,8 @@ requires-dist = [
     { name = "docling-core", marker = "extra == 'runners'", specifier = ">=2.71.0" },
     { name = "extend-ai", marker = "extra == 'extend'", specifier = ">=1.16.0" },
     { name = "extend-ai", marker = "extra == 'runners'", specifier = ">=1.16.0" },
+    { name = "filelock", marker = "extra == 'kynex'", specifier = ">=3.13" },
+    { name = "filelock", marker = "extra == 'runners'", specifier = ">=3.13" },
     { name = "fire", specifier = ">=0.7.1" },
     { name = "fuzzysearch", specifier = ">=0.7.3" },
     { name = "google-cloud-documentai", marker = "extra == 'runners'", specifier = ">=2.20.0" },
@@ -1826,7 +1832,7 @@ requires-dist = [
     { name = "unstructured-client", marker = "extra == 'runners'", specifier = ">=0.26.0" },
     { name = "warp-ingest", extras = ["ocr"], marker = "extra == 'runners'", specifier = ">=2.0.1" },
 ]
-provides-extras = ["anthropic", "aws", "azure", "datalab", "dev", "extend", "fast", "google", "landingai", "llamaextract", "local", "openai", "openweights", "reducto", "runners"]
+provides-extras = ["anthropic", "aws", "azure", "datalab", "dev", "extend", "fast", "google", "kynex", "landingai", "llamaextract", "local", "openai", "openweights", "reducto", "runners"]
 
 [[package]]
 name = "llguidance"
