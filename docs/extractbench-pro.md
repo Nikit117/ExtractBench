@@ -86,7 +86,7 @@ Costs use each provider's official listed price.
 
 | Category | One full run | Examples |
 |---|---:|---|
-| LlamaExtract | $26 – $197 | Cost Effective ~$26, Agentic ~$82, Agentic Plus ~$197 |
+| LlamaExtract | $26 – $333 | Cost Effective ~$26, Agentic ~$82, Agentic Plus ~$197, Agentic Plus (Max Effort) ~$333 |
 | Specialized APIs | $162 – $413 | Reducto Deep ~$162, Extend Operator ~$259, Pulse Effort ~$275, Datalab Accurate ~$413 |
 | Coding agents | $30 – $2,496 | Codex GPT-6 Luna ~$30, Codex GPT-6.1 Sol ~$363, Claude Code Sonnet 5.5 ~$524, Claude Code Opus 5.5 ~$1,080, Codex GPT-6 Astra ~$2,496 |
 
