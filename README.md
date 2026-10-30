@@ -356,6 +356,10 @@ Configure `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`,
 deployment, plus `AZURE_DI_ENDPOINT` and `AZURE_DI_API_KEY` for Document Intelligence.
 Then run `uv run extract-bench run kynex_gpt_5_4 --test`.
 
+Independent verification on all 370 documents gives **92.97% overall value F1**
+and an estimated **4.96¢ per page**. Split metrics and pricing are documented
+in [KYNEX verification](docs/extractbench.md#kynex-verification).
+
 ### CLI Reference
 
 | Command | Description |
