@@ -154,6 +154,8 @@ async def _extract_async(
             ]
             env = os.environ.copy()
             env.update(HARNESS_ENV)
+            env["HOME"] = td
+            env["USERPROFILE"] = td
             proc = subprocess.run(
                 cmd,
                 capture_output=True,
